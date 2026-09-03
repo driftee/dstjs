@@ -142,18 +142,18 @@ pnpm dev turf mod-catalog \
 ## 程序调用
 
 ```ts
-import { decodeKtex, parseAtlasXml } from "dstjs";
+import { decodeKtex, parseAtlasXml } from "@driftee/dstjs";
 ```
 
 也可以使用按功能拆分的子路径：
 
 ```ts
-import { parseAtlasXml } from "dstjs/atlas";
-import { openAnimationBundle, renderAnimationFrame } from "dstjs/animation";
-import { GameAssetSource } from "dstjs/game";
-import { pruneTransparentImage } from "dstjs/image";
-import { decodeKtex } from "dstjs/texture";
-import { compileWebAnimation, createPetalSceneHtml } from "dstjs/web-animation";
+import { parseAtlasXml } from "@driftee/dstjs/atlas";
+import { openAnimationBundle, renderAnimationFrame } from "@driftee/dstjs/animation";
+import { GameAssetSource } from "@driftee/dstjs/game";
+import { pruneTransparentImage } from "@driftee/dstjs/image";
+import { decodeKtex } from "@driftee/dstjs/texture";
+import { compileWebAnimation, createPetalSceneHtml } from "@driftee/dstjs/web-animation";
 ```
 
 ## 资源政策

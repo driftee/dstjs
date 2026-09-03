@@ -1,5 +1,5 @@
 {
-  "name": "dstjs",
+  "name": "@driftee/dstjs",
   "version": "0.1.0",
   "description": "A TypeScript toolkit for parsing, extracting, converting, and rendering Don't Starve Together assets.",
   "type": "module",

@@ -220,18 +220,18 @@ orchestration independently of any Wiki implementation.
 ## Library usage
 
 ```ts
-import { decodeKtex, parseAtlasXml } from "dstjs";
+import { decodeKtex, parseAtlasXml } from "@driftee/dstjs";
 ```
 
 Focused subpath exports are also available:
 
 ```ts
-import { parseAtlasXml } from "dstjs/atlas";
-import { openAnimationBundle, renderAnimationFrame } from "dstjs/animation";
-import { GameAssetSource } from "dstjs/game";
-import { pruneTransparentImage } from "dstjs/image";
-import { decodeKtex } from "dstjs/texture";
-import { compileWebAnimation, createPetalSceneHtml } from "dstjs/web-animation";
+import { parseAtlasXml } from "@driftee/dstjs/atlas";
+import { openAnimationBundle, renderAnimationFrame } from "@driftee/dstjs/animation";
+import { GameAssetSource } from "@driftee/dstjs/game";
+import { pruneTransparentImage } from "@driftee/dstjs/image";
+import { decodeKtex } from "@driftee/dstjs/texture";
+import { compileWebAnimation, createPetalSceneHtml } from "@driftee/dstjs/web-animation";
 ```
 
 ## Asset policy
