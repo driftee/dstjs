@@ -24,9 +24,10 @@ were consulted to understand and validate the binary layout:
   release audit must still compare structure and expression carefully before
   selecting a DST.js license.
 
-Real `wet_meter.zip` and `firefighter_projectile.zip` files from the developer's
-local game installation were used only for local validation. Generated PNG and
-GIF files remain under the ignored `output/` directory and are not committed.
+Real `wet_meter.zip`, `firefighter_projectile.zip`, and the Cherry Forest mod's
+`cherrytree_petal_fx.zip` files from the developer's local installation were
+used only for local validation. Generated PNG, GIF, WebP, JSON, and HTML files
+remain under the ignored `output/` directory and are not committed.
 
 ## Public release blockers
 

@@ -27,14 +27,17 @@ breaking change.
 
 - [ ] Resolve build symbols and animation element references.
 - [ ] Evaluate poses at a frame or timestamp.
-- [ ] Support symbol overrides, hidden layers, and build swaps.
+- [x] Support symbol overrides during Web animation compilation.
+- [ ] Support hidden layers and build swaps in the general pose API.
 - [x] Render common rectangular poses and stable-size frame sequences to PNG.
-- [ ] Render exact build triangle meshes and clipping masks.
+- [ ] Render exact build triangle meshes in the direct PNG frame renderer.
+- [x] Rasterize build triangle meshes into compact WebP sprite atlases.
 - [ ] Establish documented coordinate, origin, and z-order conventions.
 
 ## Phase 3: conversion and encoding
 
-- [ ] Export stable, versioned JSON.
+- [x] Export stable, versioned Web animation JSON and a WebP atlas.
+- [x] Generate a standalone two-layer Canvas scene demonstration.
 - [ ] Encode KTEX and Atlas XML.
 - [ ] Encode `build.bin` and `anim.bin` with round-trip tests.
 - [ ] Evaluate SCML and Spine adapters without weakening the core model.

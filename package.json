@@ -38,6 +38,10 @@
     "./texture": {
       "types": "./dist/texture/index.d.ts",
       "default": "./dist/texture/index.js"
+    },
+    "./web-animation": {
+      "types": "./dist/web-animation/index.d.ts",
+      "default": "./dist/web-animation/index.js"
     }
   },
   "scripts": {

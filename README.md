@@ -23,11 +23,15 @@ used by QiNeko Wiki.
 - Decode ANIM v3/v4 and BILD v5/v6 files with bounded binary reads.
 - Inspect self-contained animation ZIP files and render PNG frames or frame
   sequences through an experimental renderer.
+- Compile DST animations into a browser-readable WebP sprite atlas and JSON
+  manifest, including symbol overrides and triangle-mesh rasterization.
+- Generate a standalone two-layer Canvas scene demo with interactive density,
+  wind, speed, foreground, and playback controls.
 - Use the library programmatically or through the `dst` CLI.
 
-The current animation renderer supports the common rectangular symbol case.
-Exact triangle-mesh clipping and broader real-world compatibility remain under
-active validation.
+The direct PNG frame renderer currently supports the common rectangular symbol
+case. The Web compiler rasterizes triangle meshes before packing its sprite
+atlas. Broader real-world compatibility remains under active validation.
 
 ## Requirements
 
@@ -71,7 +75,16 @@ pnpm dev anim frames ./firefighter_projectile.zip \
   --animation spin_loop \
   --scale 4 \
   --output ./output/firefighter-projectile-frames
+
+pnpm dev anim web ./cherrytree_petal_fx.zip \
+  --override autumn=spring \
+  --demo \
+  --output ./output/cherry-petal-web
 ```
+
+The `anim web` command writes `animation.json` and `atlas.webp`. With `--demo`,
+it also writes a self-contained `index.html` that demonstrates scene
+orchestration independently of any Wiki implementation.
 
 ## Library usage
 
@@ -86,6 +99,7 @@ import { parseAtlasXml } from "dstjs/atlas";
 import { openAnimationBundle, renderAnimationFrame } from "dstjs/animation";
 import { GameAssetSource } from "dstjs/game";
 import { decodeKtex } from "dstjs/texture";
+import { compileWebAnimation, createPetalSceneHtml } from "dstjs/web-animation";
 ```
 
 ## Asset policy
