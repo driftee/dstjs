@@ -6,7 +6,13 @@ import path from "node:path";
 import { animationBounds, openAnimationBundle, renderAnimationFrame } from "./animation/index.js";
 import { extractAtlas, extractAtlasFiles, type AtlasManifest } from "./atlas/extract.js";
 import { GameAssetSource } from "./game/source.js";
-import { compileWebAnimation, createPetalSceneHtml } from "./web-animation/index.js";
+import {
+  compileWebAnimation,
+  createPetalEffectScript,
+  createPetalSceneHtml,
+  type PetalTheme,
+  type WebAnimationPackage,
+} from "./web-animation/index.js";
 
 type Arguments = {
   command: string;
@@ -62,6 +68,23 @@ async function main(): Promise<void> {
           duration: animation.frames.length / animation.frameRate,
         })),
       }, null, 2));
+      return;
+    }
+    if (action === "effect") {
+      const variantDefinitions = parseVariants(arguments_.variants);
+      const variants = Object.fromEntries(await Promise.all(variantDefinitions.map(async (variant) => [
+        variant.name,
+        await compileWebAnimation(bundle, {
+          animations: arguments_.animations,
+          symbolOverrides: variant.symbolOverrides,
+        }),
+      ] as const))) as Partial<Record<PetalTheme, WebAnimationPackage>>;
+      const outputPath = path.resolve(arguments_.output.endsWith(".js")
+        ? arguments_.output
+        : path.join(arguments_.output, "cherry-petal-effect.js"));
+      await mkdir(path.dirname(outputPath), { recursive: true });
+      await writeFile(outputPath, createPetalEffectScript(variants as Record<PetalTheme, WebAnimationPackage>), "utf8");
+      console.log(`已输出 JS 特效包到 ${outputPath}。`);
       return;
     }
     if (action === "web") {
@@ -277,6 +300,7 @@ function printUsage(exitCode: number): void {
   dst anim inspect <animation.zip>
   dst anim frame <animation.zip> --animation <名称> [--frame <序号>] [--scale <倍数>] [--output <PNG>]
   dst anim frames <animation.zip> --animation <名称> [--scale <倍数>] [--output <目录>]
+  dst anim effect <animation.zip> --animation <名称>... --variant <名称:原名=目标名>... [--output <JS 文件>]
   dst anim web <animation.zip> [--animation <名称>]... [--override <原名=目标名>]... [--variant <名称:原名=目标名>]... [--demo] [--output <目录>]
 
 示例：
@@ -284,6 +308,7 @@ function printUsage(exitCode: number): void {
   dst atlas ./inventoryimages.xml --tex ./inventoryimages.tex
   dst anim inspect ./wet_meter.zip
   dst anim frame ./wet_meter.zip --animation idle --frame 0 --output ./wet-meter.png
+  dst anim effect ./cherrytree_petal_fx.zip --animation petal1 --variant spring:autumn=spring --output ./cherry-petal-effect.js
   dst anim web ./cherrytree_petal_fx.zip --override autumn=spring --variant spring:autumn=spring --variant autumn:autumn=autumn --demo --output ./cherry-web`);
   process.exitCode = exitCode;
 }

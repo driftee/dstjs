@@ -6,6 +6,7 @@ import { parseAnimation } from "../animation/parse-animation.js";
 import { parseBuild } from "../animation/parse-build.js";
 import { createAnimationBinary, createBuildBinary } from "../animation/test-helpers.js";
 import { compileWebAnimation } from "./compile.js";
+import { createPetalEffectScript, WIKI_EFFECT_PACKAGE_HEADER } from "./effect.js";
 import { createPetalSceneHtml } from "./scene.js";
 
 function createBundle(): AnimationBundle {
@@ -86,5 +87,25 @@ describe("Web animation compiler", () => {
     expect(html).toContain("data:image/webp;base64,");
     expect(html).toContain('format":"dstjs-web-animation"');
     expect(html).toContain("loadVariant");
+  });
+
+  it("creates a self-contained effect package with the Wiki runtime contract", async () => {
+    const result = await compileWebAnimation(createBundle());
+    const script = createPetalEffectScript({
+      spring: result,
+      summer: result,
+      autumn: result,
+      winter: result,
+      cheerful: result,
+      hibeescus: result,
+    });
+
+    expect(script.startsWith(`${WIKI_EFFECT_PACKAGE_HEADER}\n`)).toBe(true);
+    expect(script).toContain("globalThis.QinekoWikiEffectPackage");
+    expect(script).toContain("async mount(options = {})");
+    expect(script).toContain("densityForViewport(width, height)");
+    expect(script).toContain("windAngleAt(Date.now())");
+    expect(script).toContain("54 * 1.2 * particle.speed");
+    expect(script).toContain("data:image/webp;base64,");
   });
 });

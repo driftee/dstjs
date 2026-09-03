@@ -92,6 +92,12 @@ The `anim web` command writes `animation.json` and `atlas.webp`. With `--demo`,
 it also writes a self-contained `index.html` that demonstrates scene
 orchestration independently of any Wiki implementation.
 
+`anim effect` writes a self-contained JavaScript effect package implementing the
+QiNeko Wiki effect runtime contract. The generated script carries the
+`qineko-wiki-effect-package:v1` format header required by the Wiki upload API.
+Animation selection can omit unwanted clips, while repeated `--variant` options
+embed theme-specific atlases.
+
 ## Library usage
 
 ```ts
