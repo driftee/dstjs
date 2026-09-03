@@ -1,0 +1,65 @@
+{
+  "name": "dstjs",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A TypeScript toolkit for parsing, extracting, converting, and rendering Don't Starve Together assets.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "packageManager": "pnpm@10.6.4",
+  "files": [
+    "dist",
+    "README.md",
+    "NOTICE.md"
+  ],
+  "bin": {
+    "dst": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./atlas": {
+      "types": "./dist/atlas/index.d.ts",
+      "default": "./dist/atlas/index.js"
+    },
+    "./game": {
+      "types": "./dist/game/index.d.ts",
+      "default": "./dist/game/index.js"
+    },
+    "./texture": {
+      "types": "./dist/texture/index.d.ts",
+      "default": "./dist/texture/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
+    "dev": "tsx src/cli.ts",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "decode-dxt": "1.0.1",
+    "fast-xml-parser": "5.11.0",
+    "gettext-parser": "9.1.1",
+    "sharp": "0.35.3",
+    "yauzl": "3.2.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.2",
+    "@types/decode-dxt": "1.0.3",
+    "@types/gettext-parser": "8.0.0",
+    "@types/node": "^22.0.0",
+    "@types/yauzl": "2.10.3",
+    "eslint": "9.39.2",
+    "tsx": "4.23.12",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "8.67.0",
+    "vitest": "4.1.11"
+  }
+}

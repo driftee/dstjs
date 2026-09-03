@@ -1,0 +1,7 @@
+node_modules/
+dist/
+coverage/
+output/
+fixtures/private/
+*.log
+.DS_Store
