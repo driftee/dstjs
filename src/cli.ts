@@ -19,6 +19,7 @@ type Arguments = {
   frame: number;
   scale: number;
   overrides: string[];
+  variants: string[];
   demo: boolean;
 };
 
@@ -69,12 +70,25 @@ async function main(): Promise<void> {
         animations: arguments_.animations,
         symbolOverrides: parseOverrides(arguments_.overrides),
       });
+      const variantDefinitions = parseVariants(arguments_.variants);
+      const variantPackages = arguments_.demo
+        ? Object.fromEntries(await Promise.all(variantDefinitions.map(async (variant) => [
+          variant.name,
+          await compileWebAnimation(bundle, {
+            animations: arguments_.animations,
+            symbolOverrides: variant.symbolOverrides,
+          }),
+        ] as const)))
+        : {};
       await mkdir(outputDirectory, { recursive: true });
       await Promise.all([
         writeFile(path.join(outputDirectory, "animation.json"), `${JSON.stringify(animationPackage.manifest, null, 2)}\n`, "utf8"),
         writeFile(path.join(outputDirectory, animationPackage.manifest.atlas.file), animationPackage.atlas),
         arguments_.demo
-          ? writeFile(path.join(outputDirectory, "index.html"), createPetalSceneHtml(animationPackage), "utf8")
+          ? writeFile(path.join(outputDirectory, "index.html"), createPetalSceneHtml(animationPackage, {
+            variants: variantPackages,
+            initialVariant: variantDefinitions[0]?.name,
+          }), "utf8")
           : Promise.resolve(),
       ]);
       console.log(`已输出 ${Object.keys(animationPackage.manifest.animations).length} 段 Web 动画到 ${outputDirectory}。`);
@@ -178,6 +192,7 @@ function parseArguments(values: string[]): Arguments {
   let frame = 0;
   let scale = 1;
   const overrides: string[] = [];
+  const variants: string[] = [];
   let demo = false;
   for (let index = 0; index < rest.length; index += 1) {
     const value = rest[index];
@@ -194,6 +209,7 @@ function parseArguments(values: string[]): Arguments {
       || value === "--frame"
       || value === "--scale"
       || value === "--override"
+      || value === "--variant"
     ) {
       const optionValue = rest[index + 1];
       if (!optionValue) throw new Error(`${value} 缺少参数`);
@@ -204,7 +220,8 @@ function parseArguments(values: string[]): Arguments {
       else if (value === "--bank") bank = optionValue;
       else if (value === "--frame") frame = parseNumberOption(value, optionValue, true);
       else if (value === "--scale") scale = parseNumberOption(value, optionValue, false);
-      else overrides.push(optionValue);
+      else if (value === "--override") overrides.push(optionValue);
+      else variants.push(optionValue);
       index += 1;
     } else if (value?.startsWith("--")) {
       throw new Error(`未知参数：${value}`);
@@ -212,7 +229,7 @@ function parseArguments(values: string[]): Arguments {
       positional.push(value);
     }
   }
-  return { command, positional, output, matches, texture, animations, bank, frame, scale, overrides, demo };
+  return { command, positional, output, matches, texture, animations, bank, frame, scale, overrides, variants, demo };
 }
 
 function requireSingleAnimation(animations: string[], action: string): string {
@@ -232,6 +249,19 @@ function parseOverrides(values: string[]): Record<string, string> {
   }));
 }
 
+function parseVariants(values: string[]): Array<{ name: string; symbolOverrides: Record<string, string> }> {
+  return values.map((value) => {
+    const separator = value.indexOf(":");
+    if (separator <= 0 || separator === value.length - 1) {
+      throw new Error(`--variant 应为 <名称>:<原 symbol>=<目标 symbol>：${value}`);
+    }
+    return {
+      name: value.slice(0, separator),
+      symbolOverrides: parseOverrides([value.slice(separator + 1)]),
+    };
+  });
+}
+
 function parseNumberOption(option: string, raw: string, integer: boolean): number {
   const value = Number(raw);
   if (!Number.isFinite(value) || value < 0 || (integer && !Number.isInteger(value))) {
@@ -247,14 +277,14 @@ function printUsage(exitCode: number): void {
   dst anim inspect <animation.zip>
   dst anim frame <animation.zip> --animation <名称> [--frame <序号>] [--scale <倍数>] [--output <PNG>]
   dst anim frames <animation.zip> --animation <名称> [--scale <倍数>] [--output <目录>]
-  dst anim web <animation.zip> [--animation <名称>]... [--override <原名=目标名>]... [--demo] [--output <目录>]
+  dst anim web <animation.zip> [--animation <名称>]... [--override <原名=目标名>]... [--variant <名称:原名=目标名>]... [--demo] [--output <目录>]
 
 示例：
   dst game "/path/to/Don't Starve Together" --match inventoryimages
   dst atlas ./inventoryimages.xml --tex ./inventoryimages.tex
   dst anim inspect ./wet_meter.zip
   dst anim frame ./wet_meter.zip --animation idle --frame 0 --output ./wet-meter.png
-  dst anim web ./cherrytree_petal_fx.zip --override autumn=spring --demo --output ./cherry-web`);
+  dst anim web ./cherrytree_petal_fx.zip --override autumn=spring --variant spring:autumn=spring --variant autumn:autumn=autumn --demo --output ./cherry-web`);
   process.exitCode = exitCode;
 }
 

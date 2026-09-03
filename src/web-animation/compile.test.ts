@@ -65,18 +65,26 @@ describe("Web animation compiler", () => {
 
   it("creates a standalone two-layer scene with interactive controls", async () => {
     const result = await compileWebAnimation(createBundle());
-    const html = createPetalSceneHtml(result, { title: "Test Petals", initialDensity: 12 });
+    const html = createPetalSceneHtml(result, {
+      title: "Test Petals",
+      initialDensity: 12,
+      variants: { red: result, pink: result },
+      initialVariant: "pink",
+    });
 
     expect(html).toContain("<!doctype html>");
     expect(html).toContain("Test Petals");
     expect(html).toContain('id="effect-background"');
     expect(html).toContain('id="effect-foreground"');
     expect(html).toContain('id="density"');
+    expect(html).toContain('id="variant"');
+    expect(html).toContain('<option value="pink" selected>pink</option>');
     expect(html).toContain('value="12"');
     expect(html).toContain('data-animation-clip checked');
     expect(html).toContain('id="clip-count">1/1');
     expect(html).toContain("updateClipSelection");
     expect(html).toContain("data:image/webp;base64,");
     expect(html).toContain('format":"dstjs-web-animation"');
+    expect(html).toContain("loadVariant");
   });
 });

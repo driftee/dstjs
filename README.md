@@ -78,6 +78,12 @@ pnpm dev anim frames ./firefighter_projectile.zip \
 
 pnpm dev anim web ./cherrytree_petal_fx.zip \
   --override autumn=spring \
+  --variant spring:autumn=spring \
+  --variant autumn:autumn=autumn \
+  --variant summer:autumn=summer \
+  --variant winter:autumn=winter \
+  --variant cheerful:autumn=cheerful \
+  --variant hibeescus:autumn=hibeescus \
   --demo \
   --output ./output/cherry-petal-web
 ```

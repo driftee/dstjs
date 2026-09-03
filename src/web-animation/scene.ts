@@ -3,6 +3,8 @@ import type { WebAnimationPackage } from "./types.js";
 export type PetalSceneHtmlOptions = {
   title?: string;
   initialDensity?: number;
+  variants?: Readonly<Record<string, WebAnimationPackage>>;
+  initialVariant?: string;
 };
 
 export function createPetalSceneHtml(
@@ -11,9 +13,25 @@ export function createPetalSceneHtml(
 ): string {
   const title = escapeHtml(options.title ?? "DST.js Web Animation · Petal Wind");
   const density = Math.max(4, Math.min(30, Math.round(options.initialDensity ?? 14)));
-  const manifestJson = JSON.stringify(animationPackage.manifest).replaceAll("<", "\\u003c");
-  const atlasSource = `data:image/webp;base64,${animationPackage.atlas.toString("base64")}`;
+  const variants = options.variants && Object.keys(options.variants).length > 0
+    ? options.variants
+    : { default: animationPackage };
+  const variantNames = Object.keys(variants);
+  const initialVariant = options.initialVariant ?? variantNames[0];
+  if (!initialVariant || !variants[initialVariant]) throw new Error(`找不到初始贴图主题 ${initialVariant ?? ""}`);
   const clipNames = Object.keys(animationPackage.manifest.animations);
+  for (const [name, variant] of Object.entries(variants)) {
+    const variantClipNames = Object.keys(variant.manifest.animations);
+    if (variantClipNames.length !== clipNames.length || variantClipNames.some((clip) => !clipNames.includes(clip))) {
+      throw new Error(`贴图主题 ${name} 的动作列表与主动画不一致`);
+    }
+  }
+  const packagesJson = JSON.stringify(Object.fromEntries(Object.entries(variants).map(([name, variant]) => [name, {
+    manifest: variant.manifest,
+    atlas: `data:image/webp;base64,${variant.atlas.toString("base64")}`,
+  }]))).replaceAll("<", "\\u003c");
+  const variantOptions = variantNames.map((name) =>
+    `<option value="${escapeHtml(name)}"${name === initialVariant ? " selected" : ""}>${escapeHtml(name)}</option>`).join("");
   const clipOptions = clipNames.map((name) => `
       <label class="clip-option"><input type="checkbox" value="${escapeHtml(name)}" data-animation-clip checked><span>${escapeHtml(name)}</span></label>`).join("");
   return `<!doctype html>
@@ -39,6 +57,7 @@ export function createPetalSceneHtml(
     .control-row { display: flex; align-items: end; gap: 14px; }
     .control { display: grid; min-width: 118px; flex: 1; gap: 7px; color: rgba(37,55,45,.72); font-size: 12px; }
     .control strong { color: #25372d; font-weight: 650; }
+    .control select { width: 100%; min-height: 37px; padding: 0 9px; border: 1px solid rgba(58,84,68,.2); border-radius: 8px; background: rgba(255,255,255,.7); color: #25372d; font: inherit; }
     input[type="range"] { width: 100%; accent-color: #a14f68; }
     .switch { display: flex; min-height: 37px; align-items: center; gap: 8px; white-space: nowrap; }
     .switch input { accent-color: #a14f68; }
@@ -52,7 +71,7 @@ export function createPetalSceneHtml(
     .clip-option:has(input:disabled) { opacity: .68; }
     button { min-height: 38px; padding: 0 18px; border: 0; border-radius: 10px; background: #25372d; color: #fff; cursor: pointer; font: inherit; font-weight: 650; }
     button:hover { background: #354d40; }
-    button:focus-visible, input:focus-visible { outline: 3px solid rgba(161,79,104,.3); outline-offset: 2px; }
+    button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid rgba(161,79,104,.3); outline-offset: 2px; }
     #status { position: fixed; z-index: 3; top: 16px; right: 18px; padding: 8px 11px; border-radius: 999px; background: rgba(255,255,255,.74); color: rgba(37,55,45,.7); font-size: 12px; backdrop-filter: blur(12px); }
     @media (max-width: 720px) {
       .scene { align-items: start; padding: 24px 16px 292px; }
@@ -79,6 +98,7 @@ export function createPetalSceneHtml(
       <label class="control"><span>密度 <strong id="density-value">${density}</strong></span><input id="density" type="range" min="4" max="30" value="${density}"></label>
       <label class="control"><span>风向 <strong id="wind-value">22°</strong></span><input id="wind" type="range" min="-60" max="60" value="22"></label>
       <label class="control"><span>速度 <strong id="speed-value">1.0×</strong></span><input id="speed" type="range" min="0.4" max="2" value="1" step="0.1"></label>
+      ${variantNames.length > 1 ? `<label class="control"><span>贴图主题</span><select id="variant">${variantOptions}</select></label>` : ""}
       <label class="switch"><input id="foreground" type="checkbox" checked>显示前景</label>
       <button id="toggle" type="button">暂停</button>
     </div>
@@ -88,11 +108,14 @@ export function createPetalSceneHtml(
       </div>
     </fieldset>
   </form>
-  <script id="animation-manifest" type="application/json">${manifestJson}</script>
+  <script id="animation-packages" type="application/json">${packagesJson}</script>
   <script>
     (() => {
       "use strict";
-      const manifest = JSON.parse(document.getElementById("animation-manifest").textContent);
+      const packages = JSON.parse(document.getElementById("animation-packages").textContent);
+      const variantInput = document.getElementById("variant");
+      let currentVariant = variantInput ? variantInput.value : Object.keys(packages)[0];
+      let manifest = packages[currentVariant].manifest;
       const backgroundCanvas = document.getElementById("effect-background");
       const foregroundCanvas = document.getElementById("effect-foreground");
       const background = backgroundCanvas.getContext("2d");
@@ -106,7 +129,7 @@ export function createPetalSceneHtml(
       const allClipNames = Object.keys(manifest.animations);
       const clipInputs = [...document.querySelectorAll("[data-animation-clip]")];
       let activeClipNames = [...allClipNames];
-      const atlas = new Image();
+      let atlas = new Image();
       const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
       let particles = [];
       let width = innerWidth;
@@ -114,6 +137,7 @@ export function createPetalSceneHtml(
       let dpr = 1;
       let previousTime = 0;
       let frameRequest = 0;
+      let variantRequest = 0;
       let userPaused = reducedMotion.matches;
       let documentPaused = document.hidden;
 
@@ -231,6 +255,21 @@ export function createPetalSceneHtml(
           if (!activeClipNames.includes(particle.clip)) resetParticle(particle, false);
         }
       }
+      function loadVariant(name) {
+        const nextPackage = packages[name];
+        const request = ++variantRequest;
+        if (!nextPackage || name === currentVariant) return;
+        const nextAtlas = new Image();
+        nextAtlas.addEventListener("load", () => {
+          if (request !== variantRequest) return;
+          currentVariant = name;
+          manifest = nextPackage.manifest;
+          atlas = nextAtlas;
+          for (const particle of particles) resetParticle(particle, true);
+          start();
+        });
+        nextAtlas.src = nextPackage.atlas;
+      }
 
       densityInput.addEventListener("input", () => {
         document.getElementById("density-value").textContent = densityInput.value;
@@ -239,6 +278,7 @@ export function createPetalSceneHtml(
       windInput.addEventListener("input", () => { document.getElementById("wind-value").textContent = windInput.value + "°"; });
       speedInput.addEventListener("input", () => { document.getElementById("speed-value").textContent = Number(speedInput.value).toFixed(1) + "×"; });
       foregroundInput.addEventListener("change", reconcileParticles);
+      if (variantInput) variantInput.addEventListener("change", () => loadVariant(variantInput.value));
       for (const input of clipInputs) input.addEventListener("change", () => updateClipSelection(input));
       toggleButton.addEventListener("click", () => { userPaused = !userPaused; start(); });
       reducedMotion.addEventListener("change", (event) => { userPaused = event.matches; start(); });
@@ -246,7 +286,7 @@ export function createPetalSceneHtml(
       addEventListener("resize", () => { resize(); reconcileParticles(); });
       addEventListener("pagehide", () => cancelAnimationFrame(frameRequest));
       atlas.addEventListener("load", () => { resize(); reconcileParticles(); start(); });
-      atlas.src = "${atlasSource}";
+      atlas.src = packages[currentVariant].atlas;
     })();
   </script>
 </body>
