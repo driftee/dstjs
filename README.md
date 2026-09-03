@@ -1,5 +1,7 @@
 # DST.js
 
+[简体中文](README.zh-CN.md)
+
 A TypeScript toolkit for parsing, extracting, converting, and rendering
 Don't Starve Together assets.
 
@@ -8,30 +10,38 @@ Don't Starve Together assets.
 > endorsed by Klei Entertainment. Don't Starve and Don't Starve Together are
 > trademarks of Klei Entertainment.
 
-The repository is currently private and under active development. The first
-working baseline is migrated from the production-tested `ktools-node` package
-used by QiNeko Wiki.
+DST.js is distributed as a standalone Node.js package and command-line tool.
 
 ## Current capabilities
 
 - Decode KTEX textures using DXT1, DXT3, DXT5, RGB, or RGBA compression.
+- Ground atlas/noise/falloff exports preserve stored RGB via `decodeKtex(input, { unpremultiplyAlpha: false })`, matching native ground shader sampling. Sprite and inventory exports keep the default alpha unpremultiplication.
+- Turf catalogs export `MONKEY_DOCK` separately in `structures`, using its real `dock_kit` inventory icon/name. Ocean assets include the dedicated `dockFalloff` atlas; this does not add a fake `turf_monkey_dock` to the normal turf palette.
+- Encode synthetic uncompressed RGBA KTEX textures for diagnostic tooling.
 - Select the largest mipmap, restore top-down orientation, and undo
   premultiplied alpha.
 - Parse Atlas XML files and extract their elements as PNG images.
-- Read loose game image resources together with `data/databundles/images.zip`.
+- Prune transparent borders from rendered PNG/GIF outputs with configurable
+  per-side padding.
+- Read loose game image and portrait resources together with
+  `data/databundles/images.zip` and `data/databundles/bigportraits.zip`.
 - Load Simplified Chinese asset names and recipe descriptions.
 - Decode ANIM v3/v4 and BILD v5/v6 files with bounded binary reads.
 - Inspect self-contained animation ZIP files and render PNG frames or frame
   sequences through an experimental renderer.
+- Reuse atlas and sprite image definitions while composing SVG frames, avoiding
+  Base64 duplication for complex animations with many triangles or elements.
+- Combine split DST animation packages, where one ZIP provides `anim.bin` and
+  another provides `build.bin` plus atlases, then export GIFs or PNG frames for
+  a selected animation clip.
 - Compile DST animations into a browser-readable WebP sprite atlas and JSON
   manifest, including symbol overrides and triangle-mesh rasterization.
 - Generate a standalone two-layer Canvas scene demo with interactive density,
   wind, speed, animation-clip filtering, foreground, and playback controls.
 - Use the library programmatically or through the `dst` CLI.
 
-The direct PNG frame renderer currently supports the common rectangular symbol
-case. The Web compiler rasterizes triangle meshes before packing its sprite
-atlas. Broader real-world compatibility remains under active validation.
+The direct PNG frame renderer and Web compiler rasterize build triangle meshes.
+Broader real-world compatibility remains under active validation.
 
 ## Requirements
 
@@ -52,6 +62,107 @@ Extract one atlas:
 pnpm dev atlas ./inventoryimages.xml \
   --tex ./inventoryimages.tex \
   --output ./output
+```
+
+Decode a standalone KTEX texture without an Atlas XML file:
+
+```bash
+pnpm dev texture decode ./noise_cherrygreen.tex \
+  --output ./output/noise-cherrygreen.png
+```
+
+Crop transparent borders from a rendered PNG or GIF. `--padding` applies to
+all sides, and side-specific options override it:
+
+```bash
+pnpm dev image prune ./output/frame.png \
+  --padding 4 \
+  --padding-bottom 10 \
+  --output ./output/frame-pruned.png
+```
+
+Generate the synthetic atlas and noise texture used by the turf calibration
+mod:
+
+```bash
+pnpm dev turf calibration-assets \
+  --output ./examples/dstjs-turf-calibrator
+```
+
+After a calibration run, parse its machine-readable server-log markers and
+create the 256-entry observation skeleton:
+
+```bash
+pnpm dev turf parse-log ./server_log.txt \
+  --output ./output/calibration-run.json
+```
+
+Recognize a completed centre-background calibration run. The decoder reads the
+single centre element for each mask, using its six-bit barcode as the primary
+signal and the seven-segment number as an optional consistency check:
+
+```bash
+pnpm dev turf recognize-native ./output/turf-captures-v2 \
+  --output ./output/turf-native-lookup.json
+```
+
+Generate the local interactive simulator from an installed game. Original game
+textures remain local and are not included in the repository:
+
+```bash
+pnpm dev turf simulator "/path/to/game/Contents/data" \
+  ./output/turf-native-lookup.json \
+  --output ./output/turf-simulator
+```
+
+The simulator starts in an angled game-style camera. Click or drag to paint,
+use the arrow controls to change turf precedence, and switch to the top-down
+debug view when inspecting individual cells.
+
+Export a reusable vanilla inventory turf catalog:
+
+```bash
+node --import tsx src/cli.ts turf catalog "/path/to/game/Contents/data" \
+  ./output/turf-native-lookup.json \
+  --output ./output/turf-catalog
+```
+
+This reads literal `TileManager.AddTile` registrations without executing Lua,
+preserves the game's render order, resolves Chinese inventory names from the
+game's PO file, and extracts icons from the numbered inventory atlases. The
+current installation exports 40 inventory-backed turfs, the DIRT eraser base,
+and the pitchfork icon. Non-inventory terrain is listed separately in
+`catalog.json`; no substitute icons or inventory names are invented. All
+exported game resources stay local.
+
+The catalog command also exports `grading.json` and raw 32³ RGBA colour cubes
+referenced by the game's `components/colourcube.lua`. It preserves the actual
+season/phase pairings (including spring night using the spring dusk cube),
+and does not execute Lua.
+
+Export the minimum turf package for a supported third-party mod:
+
+```bash
+node --import tsx src/cli.ts turf mod-catalog \
+  ./workshop/1289779251 \
+  ./output/turf-catalog/catalog.json \
+  cherry-forest 1289779251 \
+  --output ./output/turf-catalog
+```
+
+This statically reads literal `AddTile` and `ChangeTileRenderOrder` calls,
+decodes only the referenced ground atlases and noise textures, and crops the
+required inventory icons. It does not execute mod Lua or copy unrelated mod
+assets. Output is namespaced under `mods/<package-id>/`.
+
+The vanilla catalog command also exports `ocean.json` and the minimum
+`OCEAN_COASTAL` assets: the original three-layer ocean noise parameters,
+land falloff atlas, and compact `wave_shore` / `wave_shimmer` sprite sheets.
+They can be regenerated independently with:
+
+```bash
+node --import tsx src/cli.ts turf ocean-assets "$GAME_DATA" \
+  --output ./output/turf-catalog
 ```
 
 Extract matching atlases from a local game installation:
@@ -75,6 +186,20 @@ pnpm dev anim frames ./firefighter_projectile.zip \
   --animation spin_loop \
   --scale 4 \
   --output ./output/firefighter-projectile-frames
+pnpm dev anim gif ./firefighter_projectile.zip \
+  --animation spin_loop \
+  --scale 4 \
+  --output ./output/firefighter-projectile.gif
+
+pnpm dev anim inspect --anim ./ds_pig_basic.zip
+pnpm dev anim gif \
+  --anim ./ds_pig_basic.zip \
+  --build ./pig_build.zip \
+  --animation idle_loop \
+  --facing 8 \
+  --skip-missing-symbols \
+  --scale 2 \
+  --output ./output/pig-idle.gif
 
 pnpm dev anim web ./cherrytree_petal_fx.zip \
   --override autumn=spring \
@@ -92,12 +217,6 @@ The `anim web` command writes `animation.json` and `atlas.webp`. With `--demo`,
 it also writes a self-contained `index.html` that demonstrates scene
 orchestration independently of any Wiki implementation.
 
-`anim effect` writes a self-contained JavaScript effect package implementing the
-QiNeko Wiki effect runtime contract. The generated script carries the
-`qineko-wiki-effect-package:v1` format header required by the Wiki upload API.
-Animation selection can omit unwanted clips, while repeated `--variant` options
-embed theme-specific atlases.
-
 ## Library usage
 
 ```ts
@@ -110,6 +229,7 @@ Focused subpath exports are also available:
 import { parseAtlasXml } from "dstjs/atlas";
 import { openAnimationBundle, renderAnimationFrame } from "dstjs/animation";
 import { GameAssetSource } from "dstjs/game";
+import { pruneTransparentImage } from "dstjs/image";
 import { decodeKtex } from "dstjs/texture";
 import { compileWebAnimation, createPetalSceneHtml } from "dstjs/web-animation";
 ```
@@ -121,8 +241,7 @@ must supply files from game installations and content they are authorized to
 access. The project will not provide functionality intended to bypass DLC,
 skin, item-drop, or product ownership restrictions.
 
-## License status
+## License
 
-No public license is granted during private development. Public licensing is a
-release blocker and will be decided after the provenance audit described in
-[`docs/provenance.md`](docs/provenance.md).
+DST.js is released under the MIT License. Third-party notices are listed in
+`NOTICE.md` and `third_party/`.

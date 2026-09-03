@@ -3,5 +3,6 @@ dist/
 coverage/
 output/
 fixtures/private/
+/docs/
 *.log
 .DS_Store
