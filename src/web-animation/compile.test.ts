@@ -73,6 +73,9 @@ describe("Web animation compiler", () => {
     expect(html).toContain('id="effect-foreground"');
     expect(html).toContain('id="density"');
     expect(html).toContain('value="12"');
+    expect(html).toContain('data-animation-clip checked');
+    expect(html).toContain('id="clip-count">1/1');
+    expect(html).toContain("updateClipSelection");
     expect(html).toContain("data:image/webp;base64,");
     expect(html).toContain('format":"dstjs-web-animation"');
   });

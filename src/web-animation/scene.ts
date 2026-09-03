@@ -13,6 +13,9 @@ export function createPetalSceneHtml(
   const density = Math.max(4, Math.min(30, Math.round(options.initialDensity ?? 14)));
   const manifestJson = JSON.stringify(animationPackage.manifest).replaceAll("<", "\\u003c");
   const atlasSource = `data:image/webp;base64,${animationPackage.atlas.toString("base64")}`;
+  const clipNames = Object.keys(animationPackage.manifest.animations);
+  const clipOptions = clipNames.map((name) => `
+      <label class="clip-option"><input type="checkbox" value="${escapeHtml(name)}" data-animation-clip checked><span>${escapeHtml(name)}</span></label>`).join("");
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -27,26 +30,36 @@ export function createPetalSceneHtml(
     .effect-layer { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
     #effect-background { z-index: 0; }
     #effect-foreground { z-index: 2; }
-    .scene { position: relative; z-index: 1; display: grid; min-height: 100svh; place-items: center; padding: 32px; }
+    .scene { position: relative; z-index: 1; display: grid; min-height: 100svh; place-items: center; padding: 32px 32px 164px; }
     .wiki-preview { width: min(780px, 100%); padding: clamp(28px, 6vw, 64px); border: 1px solid rgba(58, 84, 68, .1); border-radius: 28px; background: rgba(255,255,255,.7); box-shadow: 0 28px 80px rgba(56, 76, 63, .14); backdrop-filter: blur(16px); }
     .eyebrow { margin: 0 0 12px; color: #a14f68; font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
     h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(36px, 8vw, 72px); font-weight: 400; letter-spacing: -.04em; }
     .description { max-width: 580px; margin: 18px 0 0; color: rgba(37,55,45,.72); font-size: 16px; line-height: 1.8; }
-    .controls { position: fixed; z-index: 3; right: 18px; bottom: 18px; left: 18px; display: flex; max-width: 940px; align-items: end; gap: 14px; margin: auto; padding: 14px; border: 1px solid rgba(58,84,68,.12); border-radius: 18px; background: rgba(255,255,255,.88); box-shadow: 0 18px 48px rgba(56,76,63,.18); backdrop-filter: blur(20px); }
+    .controls { position: fixed; z-index: 3; right: 18px; bottom: 18px; left: 18px; display: grid; max-width: 940px; gap: 12px; margin: auto; padding: 14px; border: 1px solid rgba(58,84,68,.12); border-radius: 18px; background: rgba(255,255,255,.88); box-shadow: 0 18px 48px rgba(56,76,63,.18); backdrop-filter: blur(20px); }
+    .control-row { display: flex; align-items: end; gap: 14px; }
     .control { display: grid; min-width: 118px; flex: 1; gap: 7px; color: rgba(37,55,45,.72); font-size: 12px; }
     .control strong { color: #25372d; font-weight: 650; }
     input[type="range"] { width: 100%; accent-color: #a14f68; }
     .switch { display: flex; min-height: 37px; align-items: center; gap: 8px; white-space: nowrap; }
     .switch input { accent-color: #a14f68; }
+    .clip-filter { min-width: 0; margin: 0; padding: 0; border: 0; }
+    .clip-filter legend { margin-bottom: 7px; padding: 0; color: rgba(37,55,45,.72); font-size: 12px; }
+    .clip-filter legend strong { color: #25372d; }
+    .clip-options { display: grid; grid-template-columns: repeat(10, minmax(58px, 1fr)); gap: 5px; }
+    .clip-option { display: flex; min-width: 0; align-items: center; justify-content: center; gap: 5px; padding: 5px 4px; border-radius: 7px; background: rgba(37,55,45,.045); color: rgba(37,55,45,.78); font-size: 11px; white-space: nowrap; }
+    .clip-option input { margin: 0; accent-color: #a14f68; }
+    .clip-option:has(input:not(:checked)) { background: transparent; color: rgba(37,55,45,.42); }
+    .clip-option:has(input:disabled) { opacity: .68; }
     button { min-height: 38px; padding: 0 18px; border: 0; border-radius: 10px; background: #25372d; color: #fff; cursor: pointer; font: inherit; font-weight: 650; }
     button:hover { background: #354d40; }
     button:focus-visible, input:focus-visible { outline: 3px solid rgba(161,79,104,.3); outline-offset: 2px; }
     #status { position: fixed; z-index: 3; top: 16px; right: 18px; padding: 8px 11px; border-radius: 999px; background: rgba(255,255,255,.74); color: rgba(37,55,45,.7); font-size: 12px; backdrop-filter: blur(12px); }
     @media (max-width: 720px) {
-      .scene { align-items: start; padding: 24px 16px 190px; }
+      .scene { align-items: start; padding: 24px 16px 292px; }
       .wiki-preview { margin-top: 52px; padding: 28px 24px; border-radius: 22px; }
-      .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
-      .controls button { grid-column: 1 / -1; }
+      .control-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+      .control-row button { grid-column: 1 / -1; }
+      .clip-options { grid-template-columns: repeat(5, minmax(48px, 1fr)); }
     }
   </style>
 </head>
@@ -62,11 +75,18 @@ export function createPetalSceneHtml(
   <canvas id="effect-foreground" class="effect-layer" aria-hidden="true"></canvas>
   <div id="status" role="status" aria-live="polite"></div>
   <form class="controls" onsubmit="return false">
-    <label class="control"><span>密度 <strong id="density-value">${density}</strong></span><input id="density" type="range" min="4" max="30" value="${density}"></label>
-    <label class="control"><span>风向 <strong id="wind-value">22°</strong></span><input id="wind" type="range" min="-60" max="60" value="22"></label>
-    <label class="control"><span>速度 <strong id="speed-value">1.0×</strong></span><input id="speed" type="range" min="0.4" max="2" value="1" step="0.1"></label>
-    <label class="switch"><input id="foreground" type="checkbox" checked>显示前景</label>
-    <button id="toggle" type="button">暂停</button>
+    <div class="control-row">
+      <label class="control"><span>密度 <strong id="density-value">${density}</strong></span><input id="density" type="range" min="4" max="30" value="${density}"></label>
+      <label class="control"><span>风向 <strong id="wind-value">22°</strong></span><input id="wind" type="range" min="-60" max="60" value="22"></label>
+      <label class="control"><span>速度 <strong id="speed-value">1.0×</strong></span><input id="speed" type="range" min="0.4" max="2" value="1" step="0.1"></label>
+      <label class="switch"><input id="foreground" type="checkbox" checked>显示前景</label>
+      <button id="toggle" type="button">暂停</button>
+    </div>
+    <fieldset class="clip-filter">
+      <legend>动作预设 <strong id="clip-count">${clipNames.length}/${clipNames.length}</strong></legend>
+      <div class="clip-options">${clipOptions}
+      </div>
+    </fieldset>
   </form>
   <script id="animation-manifest" type="application/json">${manifestJson}</script>
   <script>
@@ -83,7 +103,9 @@ export function createPetalSceneHtml(
       const foregroundInput = document.getElementById("foreground");
       const toggleButton = document.getElementById("toggle");
       const status = document.getElementById("status");
-      const clipNames = Object.keys(manifest.animations);
+      const allClipNames = Object.keys(manifest.animations);
+      const clipInputs = [...document.querySelectorAll("[data-animation-clip]")];
+      let activeClipNames = [...allClipNames];
       const atlas = new Image();
       const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
       let particles = [];
@@ -96,7 +118,7 @@ export function createPetalSceneHtml(
       let documentPaused = document.hidden;
 
       function random(min, max) { return min + Math.random() * (max - min); }
-      function randomClip() { return clipNames[Math.floor(Math.random() * clipNames.length)]; }
+      function randomClip() { return activeClipNames[Math.floor(Math.random() * activeClipNames.length)]; }
       function resetParticle(particle, initial) {
         const clip = manifest.animations[particle.clip = randomClip()];
         particle.animationTime = initial ? random(0, clip.duration) : 0;
@@ -196,6 +218,19 @@ export function createPetalSceneHtml(
         status.textContent = paused ? (reducedMotion.matches ? "已按系统偏好减少动态效果" : "已暂停") : "播放中 · " + particles.length + " 片花瓣";
         toggleButton.textContent = userPaused ? "播放" : "暂停";
       }
+      function updateClipSelection(changedInput) {
+        const checkedInputs = clipInputs.filter((input) => input.checked);
+        if (checkedInputs.length === 0 && changedInput) {
+          changedInput.checked = true;
+          return updateClipSelection();
+        }
+        activeClipNames = checkedInputs.map((input) => input.value);
+        for (const input of clipInputs) input.disabled = activeClipNames.length === 1 && input.checked;
+        document.getElementById("clip-count").textContent = activeClipNames.length + "/" + allClipNames.length;
+        for (const particle of particles) {
+          if (!activeClipNames.includes(particle.clip)) resetParticle(particle, false);
+        }
+      }
 
       densityInput.addEventListener("input", () => {
         document.getElementById("density-value").textContent = densityInput.value;
@@ -204,6 +239,7 @@ export function createPetalSceneHtml(
       windInput.addEventListener("input", () => { document.getElementById("wind-value").textContent = windInput.value + "°"; });
       speedInput.addEventListener("input", () => { document.getElementById("speed-value").textContent = Number(speedInput.value).toFixed(1) + "×"; });
       foregroundInput.addEventListener("change", reconcileParticles);
+      for (const input of clipInputs) input.addEventListener("change", () => updateClipSelection(input));
       toggleButton.addEventListener("click", () => { userPaused = !userPaused; start(); });
       reducedMotion.addEventListener("change", (event) => { userPaused = event.matches; start(); });
       document.addEventListener("visibilitychange", () => { documentPaused = document.hidden; start(); });

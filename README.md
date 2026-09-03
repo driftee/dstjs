@@ -26,7 +26,7 @@ used by QiNeko Wiki.
 - Compile DST animations into a browser-readable WebP sprite atlas and JSON
   manifest, including symbol overrides and triangle-mesh rasterization.
 - Generate a standalone two-layer Canvas scene demo with interactive density,
-  wind, speed, foreground, and playback controls.
+  wind, speed, animation-clip filtering, foreground, and playback controls.
 - Use the library programmatically or through the `dst` CLI.
 
 The direct PNG frame renderer currently supports the common rectangular symbol
