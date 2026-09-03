@@ -1,6 +1,6 @@
 # DST.js
 
-[English](README.md)
+[English](https://github.com/driftee/dstjs/blob/main/README.md)
 
 DST.js 是一个用于解析、提取、转换和渲染《Don't Starve Together》
 资源的 TypeScript 工具包。

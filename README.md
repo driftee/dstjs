@@ -1,6 +1,6 @@
 # DST.js
 
-[简体中文](README.zh-CN.md)
+[简体中文](https://github.com/driftee/dstjs/blob/main/README.zh-CN.md)
 
 A TypeScript toolkit for parsing, extracting, converting, and rendering
 Don't Starve Together assets.
