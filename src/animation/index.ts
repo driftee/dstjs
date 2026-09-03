@@ -1,4 +1,5 @@
 export * from "./archive.js";
+export * from "./facing.js";
 export * from "./parse-animation.js";
 export * from "./parse-build.js";
 export * from "./render.js";

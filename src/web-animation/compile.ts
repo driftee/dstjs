@@ -1,6 +1,7 @@
 import sharp from "sharp";
 
 import type { AnimationBundle } from "../animation/archive.js";
+import { sortAnimationElementsForDraw } from "../animation/render.js";
 import type { Animation, BuildFrame, BuildSymbol } from "../animation/types.js";
 import { rasterizeBuildFrame, type RasterizedBuildFrame } from "./mesh.js";
 import type {
@@ -35,8 +36,7 @@ export async function compileWebAnimation(
       frameRate: animation.frameRate,
       duration: animation.frames.length / animation.frameRate,
       frames: animation.frames.map((frame) => ({
-        elements: [...frame.elements]
-          .sort((left, right) => left.z - right.z)
+        elements: sortAnimationElementsForDraw(frame.elements)
           .map((element) => {
             const originalSymbol = symbolsByHash.get(element.symbolHash);
             if (!originalSymbol) throw new Error(`Build 中找不到 symbol 0x${element.symbolHash.toString(16)}`);

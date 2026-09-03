@@ -22,16 +22,15 @@ export async function rasterizeBuildFrame(
     throw new Error("Build frame 的顶点必须是非空三角形列表");
   }
   const left = frame.bounds.x - frame.bounds.width / 2;
-  const top = frame.bounds.y + frame.bounds.height / 2;
+  const top = frame.bounds.y - frame.bounds.height / 2;
   const width = Math.max(1, Math.ceil(frame.bounds.width + padding * 2));
   const height = Math.max(1, Math.ceil(frame.bounds.height + padding * 2));
-  const atlasSources = await Promise.all(atlases.map(async (atlas) => {
-    const png = await sharp(Buffer.from(atlas.rgba), {
-      raw: { width: atlas.width, height: atlas.height, channels: 4 },
-    }).png().toBuffer();
-    return `data:image/png;base64,${png.toString("base64")}`;
-  }));
-
+  const atlasSources = new Map<number, {
+    id: string;
+    source: string;
+    width: number;
+    height: number;
+  }>();
   const triangles: string[] = [];
   for (let index = 0; index < frame.vertices.length; index += 3) {
     const vertices = frame.vertices.slice(index, index + 3);
@@ -42,8 +41,20 @@ export async function rasterizeBuildFrame(
       throw new Error("Build frame 的单个三角形跨越多个 atlas");
     }
     const atlas = atlases[atlasIndex];
-    const source = atlasSources[atlasIndex];
-    if (!atlas || !source) throw new Error(`Build frame 使用了不存在的 atlas ${atlasIndex}`);
+    if (!atlas) throw new Error(`Build frame 使用了不存在的 atlas ${atlasIndex}`);
+    let atlasSource = atlasSources.get(atlasIndex);
+    if (!atlasSource) {
+      const png = await sharp(Buffer.from(atlas.rgba), {
+        raw: { width: atlas.width, height: atlas.height, channels: 4 },
+      }).png().toBuffer();
+      atlasSource = {
+        id: `atlas-${atlasIndex}`,
+        source: `data:image/png;base64,${png.toString("base64")}`,
+        width: atlas.width,
+        height: atlas.height,
+      };
+      atlasSources.set(atlasIndex, atlasSource);
+    }
 
     const sourcePoints = vertices.map((vertex) => ({
       x: vertex.u * atlas.width,
@@ -51,7 +62,7 @@ export async function rasterizeBuildFrame(
     }));
     const destinationPoints = vertices.map((vertex) => ({
       x: vertex.x - left + padding,
-      y: top - vertex.y + padding,
+      y: vertex.y - top + padding,
     }));
     const matrix = affineBetweenTriangles(sourcePoints, destinationPoints);
     if (!matrix) continue;
@@ -61,8 +72,7 @@ export async function rasterizeBuildFrame(
       `<polygon points="${destinationPoints.map((point) => `${point.x},${point.y}`).join(" ")}"/>`,
       "</clipPath>",
       `<g clip-path="url(#${clipId})">`,
-      `<image href="${source}" width="${atlas.width}" height="${atlas.height}"`,
-      ` transform="matrix(${matrix.join(" ")})"/>`,
+      `<use href="#${atlasSource.id}" transform="matrix(${matrix.join(" ")})"/>`,
       "</g>",
     ].join(""));
   }
@@ -70,6 +80,10 @@ export async function rasterizeBuildFrame(
 
   const svg = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
+    "<defs>",
+    ...[...atlasSources.values()].map((source) =>
+      `<image id="${source.id}" href="${source.source}" width="${source.width}" height="${source.height}"/>`),
+    "</defs>",
     ...triangles,
     "</svg>",
   ].join("");
@@ -78,7 +92,7 @@ export async function rasterizeBuildFrame(
     width,
     height,
     originX: -left + padding,
-    originY: top + padding,
+    originY: -top + padding,
   };
 }
 

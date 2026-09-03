@@ -204,7 +204,7 @@ export function createPetalSceneHtml(
           if (!sprite) continue;
           const [a, b, c, d, tx, ty] = element.transform;
           context.save();
-          context.transform(a, -c, -b, d, tx, -ty);
+          context.transform(a, b, c, d, tx, ty);
           context.drawImage(atlas, sprite.x, sprite.y, sprite.width, sprite.height, -sprite.originX, -sprite.originY, sprite.width, sprite.height);
           context.restore();
         }

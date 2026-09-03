@@ -1,0 +1,204 @@
+{
+  "animationPixelsPerWorldUnit": 160,
+  "buildings": [
+    { "id": "firepit", "archive": "firepit", "animation": "idle" },
+    { "id": "coldfirepit", "archive": "coldfirepit", "animation": "idle" },
+    { "id": "cookpot", "archive": "cook_pot", "animation": "idle_empty" },
+    { "id": "treasurechest", "archive": "treasure_chest", "animation": "closed" },
+    { "id": "dragonflychest", "archive": "dragonfly_chest", "animation": "closed" },
+    { "id": "researchlab", "archive": "researchlab", "animation": "idle" },
+    { "id": "researchlab2", "archive": "researchlab2", "animation": "idle" },
+    { "id": "icebox", "archive": "ice_box", "animation": "closed" },
+    { "id": "saltbox", "archive": "saltbox", "animation": "closed" },
+    { "id": "tent", "archive": "tent", "animation": "idle" },
+    { "id": "siestahut", "archive": "siesta_canopy", "animation": "idle" },
+    { "id": "mushroomlight", "archive": "mushroom_light", "animation": "idle" },
+    { "id": "mushroomlight2", "archive": "mushroom_light2", "animation": "idle" },
+    { "id": "birdcage", "archive": "bird_cage", "animation": "idle_empty" },
+    { "id": "beebox", "archive": "bee_box", "animation": "idle" },
+    { "id": "lightningrod", "archive": "lightning_rod", "animation": "idle" },
+    { "id": "homesign", "archive": "sign_home", "animation": "idle" },
+    { "id": "researchlab3", "archive": "researchlab3", "animation": "idle" },
+    { "id": "researchlab4", "archive": "researchlab4", "animation": "idle" },
+    { "id": "pighouse", "archive": "pig_house", "animation": "idle" },
+    { "id": "rabbithouse", "archive": "rabbit_house", "animation": "rabbithouse" },
+    { "id": "wardrobe", "archive": "wardrobe", "animation": "closed" },
+    { "id": "rainometer", "archive": "rain_meter", "animation": "idle" },
+    { "id": "winterometer", "archive": "winter_meter", "animation": "idle" },
+    { "id": "cartographydesk", "archive": "cartography_desk", "animation": "idle" },
+    { "id": "compostingbin", "archive": "compostingbin", "animation": "idle" },
+    { "id": "tacklestation", "archive": "tackle_station", "animation": "idle" },
+    { "id": "townportal", "archive": "townportal", "animation": "idle_off" },
+    { "id": "scarecrow", "archive": "scarecrow", "animation": "idle" },
+    { "id": "farmplot", "archive": "farmplot", "animation": "empty" },
+    { "id": "moonbase", "archive": "moonbase", "animation": "full" },
+    { "id": "seafaringprototyper", "archive": "seafaring_prototyper", "animation": "idle" },
+    { "id": "fishbox", "archive": "fish_box", "animation": "closed" },
+    { "id": "winonacatapult", "archive": "winona_catapult", "animation": "idle_off_nodir" },
+    { "id": "winonaspotlight", "archive": "winona_spotlight", "animation": "idle", "facing": 8 },
+    { "id": "winonabatteryhigh", "archive": "winona_battery_high", "animation": "idle_empty" },
+    { "id": "winonabatterylow", "archive": "winona_battery_low", "animation": "idle_empty" },
+    { "id": "firesuppressor", "archive": "firefighter", "animation": "idle_off" }
+  ],
+  "walls": [
+    { "id": "wall_hay", "archive": "wall", "buildArchive": "wall_hay", "animation": "half" },
+    { "id": "wall_wood", "archive": "wall", "buildArchive": "wall_wood", "animation": "half" },
+    { "id": "wall_stone", "archive": "wall", "buildArchive": "wall_stone", "animation": "half" },
+    { "id": "wall_ruins", "archive": "wall", "buildArchive": "wall_ruins", "animation": "half" },
+    { "id": "wall_moonrock", "archive": "wall", "buildArchive": "wall_moonrock", "animation": "half" },
+    { "id": "wall_dreadstone", "archive": "wall_dreadstone", "animation": "half" },
+    { "id": "wall_scrap", "archive": "wall", "buildArchive": "wall_scrap", "animation": "half" },
+    { "id": "fence", "archive": "fence_thin", "wideArchive": "fence", "buildArchive": "fence", "animation": "idle", "eightFacings": true },
+    { "id": "fence_gate", "archive": "fence_gate_thin", "wideArchive": "fence_gate", "buildArchive": "fence_gate", "animation": "idle", "swingRightAnimation": "idleright", "eightFacings": true }
+  ],
+  "plants": [
+    {
+      "id": "grass",
+      "archive": "grass",
+      "buildArchive": "grass1",
+      "animation": "idle",
+      "states": [
+        { "id": "full", "label": "可采集", "animation": "idle" },
+        { "id": "empty", "label": "已采集", "animation": "picked", "frame": "last" },
+        { "id": "withered", "label": "枯萎", "animation": "idle_dead", "frame": "last" }
+      ]
+    },
+    {
+      "id": "sapling",
+      "archive": "sapling",
+      "animation": "sway",
+      "states": [
+        { "id": "full", "label": "可采集", "animation": "sway" },
+        { "id": "empty", "label": "已采集", "animation": "empty", "frame": "last" },
+        { "id": "withered", "label": "枯萎", "animation": "idle_dead", "frame": "last" }
+      ]
+    },
+    {
+      "id": "berrybush",
+      "archive": "berrybush",
+      "animation": "idle",
+      "states": [
+        { "id": "ripe", "label": "结果", "animation": "idle", "hiddenLayers": ["berries", "berriesmore", "snow"] },
+        { "id": "ripe-snow", "label": "结果 · 覆雪", "animation": "idle", "hiddenLayers": ["berries", "berriesmore"], "snow": true },
+        { "id": "empty", "label": "已采集", "animation": "idle", "hiddenLayers": ["berries", "berriesmore", "berriesmost", "snow"], "frame": "last" },
+        { "id": "empty-snow", "label": "已采集 · 覆雪", "animation": "idle", "hiddenLayers": ["berries", "berriesmore", "berriesmost"], "snow": true, "frame": "last" },
+        { "id": "withered", "label": "枯萎", "animation": "dead", "hiddenLayers": ["berries", "berriesmore", "berriesmost", "snow"], "frame": "last" },
+        { "id": "withered-snow", "label": "枯萎 · 覆雪", "animation": "dead", "hiddenLayers": ["berries", "berriesmore", "berriesmost"], "snow": true, "frame": "last" }
+      ]
+    },
+    {
+      "id": "berrybush2",
+      "archive": "berrybush2",
+      "animation": "idle",
+      "states": [
+        { "id": "ripe", "label": "结果", "animation": "idle", "hiddenLayers": ["berries", "berriesmore", "snow"] },
+        { "id": "ripe-snow", "label": "结果 · 覆雪", "animation": "idle", "hiddenLayers": ["berries", "berriesmore"], "snow": true },
+        { "id": "empty", "label": "已采集", "animation": "idle", "hiddenLayers": ["berries", "berriesmore", "berriesmost", "snow"], "frame": "last" },
+        { "id": "empty-snow", "label": "已采集 · 覆雪", "animation": "idle", "hiddenLayers": ["berries", "berriesmore", "berriesmost"], "snow": true, "frame": "last" },
+        { "id": "withered", "label": "枯萎", "animation": "dead", "hiddenLayers": ["berries", "berriesmore", "berriesmost", "snow"], "frame": "last" },
+        { "id": "withered-snow", "label": "枯萎 · 覆雪", "animation": "dead", "hiddenLayers": ["berries", "berriesmore", "berriesmost"], "snow": true, "frame": "last" }
+      ]
+    },
+    {
+      "id": "berrybushjuicy",
+      "archive": "berrybush_juicy",
+      "animation": "idle",
+      "states": [
+        { "id": "ripe", "label": "结果", "animation": "idle", "hiddenLayers": ["berries", "berriesmore", "snow"] },
+        { "id": "ripe-snow", "label": "结果 · 覆雪", "animation": "idle", "hiddenLayers": ["berries", "berriesmore"], "snow": true },
+        { "id": "empty", "label": "已采集", "animation": "idle", "hiddenLayers": ["berries", "berriesmore", "berriesmost", "snow"], "frame": "last" },
+        { "id": "empty-snow", "label": "已采集 · 覆雪", "animation": "idle", "hiddenLayers": ["berries", "berriesmore", "berriesmost"], "snow": true, "frame": "last" },
+        { "id": "withered", "label": "枯萎", "animation": "dead", "hiddenLayers": ["berries", "berriesmore", "berriesmost", "snow"], "frame": "last" },
+        { "id": "withered-snow", "label": "枯萎 · 覆雪", "animation": "dead", "hiddenLayers": ["berries", "berriesmore", "berriesmost"], "snow": true, "frame": "last" }
+      ]
+    },
+    {
+      "id": "marbleshrub",
+      "archive": "marbleshrub",
+      "animation": "idle_short",
+      "states": [
+        { "id": "short", "label": "小型", "animation": "idle_short", "hiddenLayers": ["snow"] },
+        { "id": "short-snow", "label": "小型 · 覆雪", "animation": "idle_short", "snow": true },
+        { "id": "normal", "label": "普通", "animation": "idle_normal", "hiddenLayers": ["snow"] },
+        { "id": "normal-snow", "label": "普通 · 覆雪", "animation": "idle_normal", "snow": true },
+        { "id": "tall", "label": "大型", "animation": "idle_tall", "hiddenLayers": ["snow"] },
+        { "id": "tall-snow", "label": "大型 · 覆雪", "animation": "idle_tall", "snow": true },
+        { "id": "old", "label": "老化", "animation": "idle_old", "hiddenLayers": ["snow"] },
+        { "id": "old-snow", "label": "老化 · 覆雪", "animation": "idle_old", "snow": true }
+      ]
+    },
+    {
+      "id": "evergreen",
+      "archive": "evergreen_short_normal",
+      "buildArchive": "evergreen_new",
+      "animation": "idle_short",
+      "states": [
+        { "id": "short", "label": "小型", "archive": "evergreen_short_normal", "animation": "idle_short", "hiddenLayers": ["snow"] },
+        { "id": "short-snow", "label": "小型 · 覆雪", "archive": "evergreen_short_normal", "animation": "idle_short", "snow": true },
+        { "id": "normal", "label": "普通", "archive": "evergreen_short_normal", "animation": "idle_normal", "hiddenLayers": ["snow"] },
+        { "id": "normal-snow", "label": "普通 · 覆雪", "archive": "evergreen_short_normal", "animation": "idle_normal", "snow": true },
+        { "id": "tall", "label": "大型", "archive": "evergreen_tall_old", "animation": "idle_tall", "hiddenLayers": ["snow"] },
+        { "id": "tall-snow", "label": "大型 · 覆雪", "archive": "evergreen_tall_old", "animation": "idle_tall", "snow": true },
+        { "id": "old", "label": "老化", "archive": "evergreen_tall_old", "animation": "idle_old", "hiddenLayers": ["snow"] },
+        { "id": "old-snow", "label": "老化 · 覆雪", "archive": "evergreen_tall_old", "animation": "idle_old", "snow": true }
+      ]
+    },
+    {
+      "id": "twiggytree",
+      "archive": "twiggy_short_normal",
+      "buildArchive": "twiggy_build",
+      "animation": "idle_short",
+      "states": [
+        { "id": "short", "label": "小型", "archive": "twiggy_short_normal", "animation": "idle_short", "hiddenLayers": ["snow"] },
+        { "id": "short-snow", "label": "小型 · 覆雪", "archive": "twiggy_short_normal", "animation": "idle_short", "snow": true },
+        { "id": "normal", "label": "普通", "archive": "twiggy_short_normal", "animation": "idle_normal", "hiddenLayers": ["snow"] },
+        { "id": "normal-snow", "label": "普通 · 覆雪", "archive": "twiggy_short_normal", "animation": "idle_normal", "snow": true },
+        { "id": "tall", "label": "大型", "archive": "twiggy_tall_old", "animation": "idle_tall", "hiddenLayers": ["snow"] },
+        { "id": "tall-snow", "label": "大型 · 覆雪", "archive": "twiggy_tall_old", "animation": "idle_tall", "snow": true },
+        { "id": "old", "label": "老化", "archive": "twiggy_tall_old", "animation": "idle_old", "hiddenLayers": ["snow"] },
+        { "id": "old-snow", "label": "老化 · 覆雪", "archive": "twiggy_tall_old", "animation": "idle_old", "snow": true }
+      ]
+    },
+    {
+      "id": "rock_avocado_bush",
+      "archive": "rock_avocado",
+      "buildArchive": "rock_avocado_build",
+      "animation": "idle3",
+      "states": [
+        { "id": "empty", "label": "采摘后", "animation": "idle1" },
+        { "id": "growing", "label": "生长中", "animation": "idle2" },
+        { "id": "ripe", "label": "成熟", "animation": "idle3" },
+        { "id": "overripe", "label": "即将碎裂", "animation": "idle4" },
+        { "id": "withered", "label": "枯萎", "animation": "dead1" }
+      ]
+    },
+    {
+      "id": "bananabush",
+      "archive": "bananabush",
+      "animation": "idle_big",
+      "states": [
+        { "id": "empty", "label": "采摘后", "animation": "idle_empty" },
+        { "id": "small", "label": "小型", "animation": "idle_small" },
+        { "id": "normal", "label": "中型", "animation": "idle_medium" },
+        { "id": "ripe", "label": "成熟", "animation": "idle_big" },
+        { "id": "withered", "label": "枯萎", "animation": "dead", "frame": "last" }
+      ]
+    },
+    {
+      "id": "deciduoustree",
+      "archive": "tree_leaf_normal",
+      "buildArchive": "tree_leaf_trunk_build",
+      "animation": "idle_normal",
+      "symbolOverrides": { "swap_leaves": "swap_leaves" },
+      "symbolOverrideBuildArchives": ["tree_leaf_green_build"],
+      "states": [
+        { "id": "short", "label": "小型", "archive": "tree_leaf_short", "animation": "idle_short" },
+        { "id": "short-snow", "label": "小型 · 覆雪", "archive": "tree_leaf_short", "animation": "idle_short", "snow": true },
+        { "id": "normal", "label": "普通", "archive": "tree_leaf_normal", "animation": "idle_normal" },
+        { "id": "normal-snow", "label": "普通 · 覆雪", "archive": "tree_leaf_normal", "animation": "idle_normal", "snow": true },
+        { "id": "tall", "label": "大型", "archive": "tree_leaf_tall", "animation": "idle_tall" },
+        { "id": "tall-snow", "label": "大型 · 覆雪", "archive": "tree_leaf_tall", "animation": "idle_tall", "snow": true }
+      ]
+    }
+  ]
+}

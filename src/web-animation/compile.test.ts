@@ -6,7 +6,7 @@ import { parseAnimation } from "../animation/parse-animation.js";
 import { parseBuild } from "../animation/parse-build.js";
 import { createAnimationBinary, createBuildBinary } from "../animation/test-helpers.js";
 import { compileWebAnimation } from "./compile.js";
-import { createPetalEffectScript, WIKI_EFFECT_PACKAGE_HEADER } from "./effect.js";
+import { createAnimationPlayerHtml } from "./player.js";
 import { createPetalSceneHtml } from "./scene.js";
 
 function createBundle(): AnimationBundle {
@@ -89,23 +89,28 @@ describe("Web animation compiler", () => {
     expect(html).toContain("loadVariant");
   });
 
-  it("creates a self-contained effect package with the Wiki runtime contract", async () => {
+  it("creates a self-contained single entity player", async () => {
     const result = await compileWebAnimation(createBundle());
-    const script = createPetalEffectScript({
-      spring: result,
-      summer: result,
-      autumn: result,
-      winter: result,
-      cheerful: result,
-      hibeescus: result,
+    const element = result.manifest.animations.idle?.frames[0]?.elements[0];
+    if (!element) throw new Error("missing synthetic element");
+    element.transform = [1, 2, 3, 1, 0, 0];
+    const html = createAnimationPlayerHtml(result, {
+      title: "Mr. Skitts",
+      initialAnimation: "idle",
     });
 
-    expect(script.startsWith(`${WIKI_EFFECT_PACKAGE_HEADER}\n`)).toBe(true);
-    expect(script).toContain("globalThis.QinekoWikiEffectPackage");
-    expect(script).toContain("async mount(options = {})");
-    expect(script).toContain("densityForViewport(width, height)");
-    expect(script).toContain("windAngleAt(Date.now())");
-    expect(script).toContain("54 * 1.2 * particle.speed");
-    expect(script).toContain("data:image/webp;base64,");
+    expect(html).toContain("<!doctype html>");
+    expect(html).toContain("Mr. Skitts");
+    expect(html).toContain('id="player"');
+    expect(html).toContain('id="animation"');
+    expect(html).toContain('<option value="idle" selected>idle</option>');
+    expect(html).toContain('id="replay"');
+    expect(html).toContain('id="loop"');
+    expect(html).toContain("defaultLoop");
+    expect(html).toContain("clip.duration - 1 / clip.frameRate");
+    expect(html).toContain("context.transform(a, b, c, d, tx, ty)");
+    expect(html).toContain('"bounds":{"idle":{"left":-8,"top":-6,"right":8,"bottom":6}}');
+    expect(html).toContain("data:image/webp;base64,");
   });
+
 });

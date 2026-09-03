@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>万物书 · 氛围特效预览</title>
+  <style>
+    :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body { color: #46394f; background: #e8daf2; }
+    .backdrop { position: fixed; inset: 0; overflow: hidden; background: radial-gradient(circle at 50% 18%, rgba(255,255,255,.92), transparent 31%), linear-gradient(180deg, #cfc6f2 0%, #ead9f4 48%, #dce8dd 100%); }
+    .effect-layer { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+    #sky { z-index: 0; }
+    #fireflies { z-index: 2; }
+    #petals { z-index: 4; }
+    #status { position: fixed; z-index: 6; top: 16px; right: 18px; padding: 8px 12px; border: 1px solid rgba(255,255,255,.32); border-radius: 999px; background: rgba(74,58,84,.62); color: #fff; font-size: 12px; backdrop-filter: blur(12px); }
+    .controls { position: fixed; z-index: 6; right: 18px; bottom: 18px; left: 18px; display: grid; max-width: 920px; grid-template-columns: minmax(150px,1fr) minmax(150px,1fr) auto auto auto auto; align-items: end; gap: 12px; margin: auto; padding: 14px; border: 1px solid rgba(255,255,255,.48); border-radius: 18px; background: rgba(255,250,255,.8); box-shadow: 0 20px 60px rgba(69,48,87,.2); backdrop-filter: blur(18px); }
+    .control { display: grid; gap: 6px; color: rgba(70,57,79,.68); font-size: 11px; }
+    .control span { display: flex; justify-content: space-between; gap: 10px; }
+    input[type="range"] { width: 100%; min-height: 34px; accent-color: #9d70b6; }
+    .switch { display: flex; min-height: 38px; align-items: center; gap: 7px; color: rgba(70,57,79,.78); font-size: 12px; white-space: nowrap; }
+    .switch input { accent-color: #9d70b6; }
+    button { min-height: 38px; padding: 0 16px; border: 0; border-radius: 10px; background: #6e547d; color: #fff; cursor: pointer; font: inherit; font-weight: 700; }
+    button:hover { background: #816391; }
+    button:focus-visible, input:focus-visible { outline: 3px solid rgba(126,86,151,.28); outline-offset: 2px; }
+    @media (max-width: 760px) {
+      .controls { grid-template-columns: 1fr 1fr; }
+      .controls button { grid-column: 1 / -1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="backdrop"></div>
+  <canvas id="sky" class="effect-layer" aria-hidden="true"></canvas>
+  <canvas id="fireflies" class="effect-layer" aria-hidden="true"></canvas>
+  <canvas id="petals" class="effect-layer" aria-hidden="true"></canvas>
+  <output id="status" role="status" aria-live="polite">正在载入动画…</output>
+  <form class="controls" onsubmit="return false">
+    <label class="control"><span>萤火密度 <strong id="density-value">7</strong></span><input id="density" type="range" min="2" max="20" value="7"></label>
+    <label class="control"><span>播放速度 <strong id="speed-value">1.0×</strong></span><input id="speed" type="range" min="0.4" max="1.8" value="1" step="0.1"></label>
+    <label class="switch"><input id="show-sky" type="checkbox" checked>天空云层</label>
+    <label class="switch"><input id="show-fireflies" type="checkbox" checked>地面萤火</label>
+    <label class="switch"><input id="show-petals" type="checkbox" checked>樱花瓣</label>
+    <button id="toggle" type="button">暂停</button>
+  </form>
+  <script>
+    (() => {
+      "use strict";
+      const canvases = {
+        sky: document.getElementById("sky"),
+        fireflies: document.getElementById("fireflies"),
+        petals: document.getElementById("petals"),
+      };
+      const contexts = Object.fromEntries(Object.entries(canvases).map(([name, canvas]) => [name, canvas.getContext("2d")]));
+      const densityInput = document.getElementById("density");
+      const speedInput = document.getElementById("speed");
+      const skyInput = document.getElementById("show-sky");
+      const fireflyInput = document.getElementById("show-fireflies");
+      const petalInput = document.getElementById("show-petals");
+      const toggleButton = document.getElementById("toggle");
+      const status = document.getElementById("status");
+      const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+      let packages;
+      let width = innerWidth;
+      let height = innerHeight;
+      let dpr = 1;
+      let previousTime = 0;
+      let elapsed = 0;
+      let frameRequest = 0;
+      let userPaused = reducedMotion.matches;
+      let documentPaused = document.hidden;
+      let fireflies = [];
+      let petals = [];
+
+      function random(min, max) { return min + Math.random() * (max - min); }
+      function loadImage(source) {
+        return new Promise((resolve, reject) => {
+          const image = new Image();
+          image.addEventListener("load", () => resolve(image), { once: true });
+          image.addEventListener("error", () => reject(new Error("无法载入 " + source)), { once: true });
+          image.src = source;
+        });
+      }
+      async function loadPackage(directory) {
+        const response = await fetch(directory + "/animation.json");
+        if (!response.ok) throw new Error("无法载入 " + directory + " 动画数据");
+        const manifest = await response.json();
+        const atlas = await loadImage(directory + "/" + manifest.atlas.file);
+        const clipName = Object.keys(manifest.animations)[0];
+        const clip = manifest.animations[clipName];
+        return { manifest, atlas, clip, bounds: animationBounds(manifest, clip) };
+      }
+      function animationBounds(manifest, clip) {
+        const bounds = { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity };
+        for (const frame of clip.frames) for (const element of frame.elements) {
+          const sprite = manifest.sprites[element.sprite];
+          if (!sprite) continue;
+          const [a,b,c,d,tx,ty] = element.transform;
+          const corners = [[-sprite.originX,-sprite.originY],[sprite.width-sprite.originX,-sprite.originY],[-sprite.originX,sprite.height-sprite.originY],[sprite.width-sprite.originX,sprite.height-sprite.originY]];
+          for (const [x,y] of corners) {
+            const px = a*x+c*y+tx;
+            const py = b*x+d*y+ty;
+            bounds.left = Math.min(bounds.left,px); bounds.right = Math.max(bounds.right,px);
+            bounds.top = Math.min(bounds.top,py); bounds.bottom = Math.max(bounds.bottom,py);
+          }
+        }
+        return bounds;
+      }
+      function resize() {
+        width = innerWidth; height = innerHeight; dpr = Math.min(devicePixelRatio || 1, 1.5);
+        for (const canvas of Object.values(canvases)) {
+          canvas.width = Math.round(width*dpr); canvas.height = Math.round(height*dpr);
+          canvas.style.width = width+"px"; canvas.style.height = height+"px";
+        }
+        reconcileFireflies(); reconcilePetals();
+      }
+      function clear(context) {
+        context.setTransform(1,0,0,1,0,0);
+        context.clearRect(0,0,context.canvas.width,context.canvas.height);
+        context.setTransform(dpr,0,0,dpr,0,0);
+      }
+      function drawClip(context, packageData, time, x, y, scale, alpha, flipY = false) {
+        const { manifest, atlas, clip, bounds } = packageData;
+        const frame = clip.frames[Math.floor((time % clip.duration)*clip.frameRate) % clip.frames.length];
+        const centerX = (bounds.left+bounds.right)/2;
+        const centerY = (bounds.top+bounds.bottom)/2;
+        context.save(); context.globalAlpha = alpha; context.translate(x,y); context.scale(scale,flipY ? -scale : scale); context.translate(-centerX,-centerY);
+        for (const element of frame.elements) {
+          const sprite = manifest.sprites[element.sprite]; if (!sprite) continue;
+          const [a,b,c,d,tx,ty] = element.transform;
+          context.save(); context.transform(a,b,c,d,tx,ty);
+          context.drawImage(atlas,sprite.x,sprite.y,sprite.width,sprite.height,-sprite.originX,-sprite.originY,sprite.width,sprite.height);
+          context.restore();
+        }
+        context.restore();
+      }
+      function resetFirefly(item) {
+        item.x = random(-width*.04,width*1.04); item.y = random(height*.38,height*.94);
+        item.scale = random(.22,.56); item.alpha = random(.34,.82); item.time = random(0,packages.fireflies.clip.duration);
+      }
+      function reconcileFireflies() {
+        const target = Number(densityInput.value);
+        while (fireflies.length < target) { const item = {}; resetFirefly(item); fireflies.push(item); }
+        fireflies.length = Math.min(fireflies.length,target);
+        document.getElementById("density-value").textContent = String(target);
+      }
+      function resetPetal(item, initial) {
+        item.x = initial ? random(0,width) : random(-80,width*.7); item.y = initial ? random(-40,height) : random(-100,-20);
+        item.size = random(18,46); item.speed = random(18,48); item.sway = random(16,48); item.phase = random(0,Math.PI*2); item.frame = Math.floor(random(0,8)); item.alpha = random(.32,.78);
+      }
+      function reconcilePetals() {
+        const target = Math.max(8,Math.round(width*height/85000));
+        while (petals.length < target) { const item = {}; resetPetal(item,true); petals.push(item); }
+        petals.length = Math.min(petals.length,target);
+      }
+      function drawSky() {
+        clear(contexts.sky); if (!skyInput.checked) return;
+        const b = packages.sky.bounds; const scale = Math.min(width*1.08/(b.right-b.left), Math.max(1,height*.46/(b.bottom-b.top)));
+        drawClip(contexts.sky,packages.sky,elapsed,width/2,height*.20,scale,.88,true);
+      }
+      function drawFireflies() {
+        clear(contexts.fireflies); if (!fireflyInput.checked) return;
+        for (const item of fireflies) drawClip(contexts.fireflies,packages.fireflies,item.time,item.x,item.y,item.scale,item.alpha);
+      }
+      function drawPetals(delta, sceneSpeed) {
+        clear(contexts.petals); if (!petalInput.checked) return;
+        const image = packages.petals;
+        for (const item of petals) {
+          item.y += item.speed*sceneSpeed*delta; item.x += (8+Math.sin(elapsed*.8+item.phase)*item.sway)*sceneSpeed*delta;
+          if (item.y > height+70 || item.x > width+90) resetPetal(item,false);
+          contexts.petals.save(); contexts.petals.globalAlpha = item.alpha; contexts.petals.translate(item.x,item.y); contexts.petals.rotate(Math.sin(elapsed+item.phase)*.8);
+          contexts.petals.drawImage(image,item.frame*64,0,64,64,-item.size/2,-item.size/2,item.size,item.size);
+          contexts.petals.restore();
+        }
+      }
+      function render(time) {
+        if (userPaused || documentPaused || !packages) return;
+        const delta = previousTime === 0 ? 0 : Math.min(.05,(time-previousTime)/1000); previousTime = time;
+        const sceneSpeed = Number(speedInput.value); elapsed += delta*sceneSpeed;
+        for (const item of fireflies) item.time += delta*sceneSpeed;
+        drawSky(); drawFireflies(); drawPetals(delta,sceneSpeed);
+        frameRequest = requestAnimationFrame(render);
+      }
+      function updateStatus() {
+        const paused = userPaused || documentPaused;
+        status.textContent = paused ? (reducedMotion.matches ? "已按系统偏好减少动态效果" : "已暂停") : "播放中 · 三层氛围特效";
+        toggleButton.textContent = userPaused ? "播放" : "暂停";
+        document.getElementById("speed-value").textContent = Number(speedInput.value).toFixed(1)+"×";
+      }
+      function start() {
+        cancelAnimationFrame(frameRequest); previousTime = 0; updateStatus();
+        if (!userPaused && !documentPaused && packages) frameRequest = requestAnimationFrame(render);
+        else if (packages) { drawSky(); drawFireflies(); drawPetals(0,0); }
+      }
+      densityInput.addEventListener("input", () => { reconcileFireflies(); updateStatus(); });
+      speedInput.addEventListener("input", updateStatus);
+      for (const input of [skyInput,fireflyInput,petalInput]) input.addEventListener("change", start);
+      toggleButton.addEventListener("click", () => { userPaused = !userPaused; start(); });
+      addEventListener("resize", resize);
+      document.addEventListener("visibilitychange", () => { documentPaused = document.hidden; start(); });
+      Promise.all([loadPackage("sky"),loadPackage("fireflies"),loadImage("cherry-blossom-petals.png")]).then(([sky,fireflyPackage,petalImage]) => {
+        packages = { sky, fireflies: fireflyPackage, petals: petalImage }; resize(); start();
+      }).catch((error) => { status.textContent = error.message; });
+      updateStatus();
+    })();
+  </script>
+</body>
+</html>

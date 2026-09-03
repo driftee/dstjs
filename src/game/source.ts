@@ -1,30 +1,44 @@
 import { access, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
-import { buffer } from "node:stream/consumers";
 import type { Readable } from "node:stream";
 
 import yauzl, { type Entry, type ZipFile } from "yauzl";
 
 const MAX_ARCHIVE_ENTRY_BYTES = 64 * 1024 * 1024;
 
+type ArchiveEntry = {
+  archive: ZipFile;
+  entry: Entry;
+};
+
 export class GameAssetSource {
   private constructor(
     readonly dataDirectory: string,
     private readonly looseFiles: ReadonlyMap<string, string>,
-    private readonly archive: ZipFile | null,
-    private readonly archiveEntries: ReadonlyMap<string, Entry>,
+    private readonly archives: readonly ZipFile[],
+    private readonly archiveEntries: ReadonlyMap<string, ArchiveEntry>,
   ) {}
 
   static async open(gamePath: string): Promise<GameAssetSource> {
     const dataDirectory = await resolveDataDirectory(gamePath);
     const looseFiles = await indexLooseFiles(dataDirectory);
-    const archivePath = path.join(dataDirectory, "databundles", "images.zip");
-    const hasArchive = await exists(archivePath);
-    if (!hasArchive) return new GameAssetSource(dataDirectory, looseFiles, null, new Map());
-
-    const archive = await openZip(archivePath);
-    const archiveEntries = await indexZip(archive);
-    return new GameAssetSource(dataDirectory, looseFiles, archive, archiveEntries);
+    const archives: ZipFile[] = [];
+    const archiveEntries = new Map<string, ArchiveEntry>();
+    try {
+      for (const archiveName of ["images.zip", "bigportraits.zip"]) {
+        const archivePath = path.join(dataDirectory, "databundles", archiveName);
+        if (!await exists(archivePath)) continue;
+        const archive = await openZip(archivePath);
+        archives.push(archive);
+        for (const [key, entry] of await indexZip(archive)) {
+          archiveEntries.set(key, { archive, entry });
+        }
+      }
+    } catch (error) {
+      for (const archive of archives) archive.close();
+      throw error;
+    }
+    return new GameAssetSource(dataDirectory, looseFiles, archives, archiveEntries);
   }
 
   listAtlasKeys(): string[] {
@@ -39,16 +53,16 @@ export class GameAssetSource {
     const loosePath = this.looseFiles.get(normalized);
     if (loosePath) return readFile(loosePath);
 
-    const entry = this.archiveEntries.get(normalized);
-    if (!entry || !this.archive) throw new Error(`找不到游戏资源：${normalized}`);
-    if (entry.uncompressedSize > MAX_ARCHIVE_ENTRY_BYTES) {
+    const archived = this.archiveEntries.get(normalized);
+    if (!archived) throw new Error(`找不到游戏资源：${normalized}`);
+    if (archived.entry.uncompressedSize > MAX_ARCHIVE_ENTRY_BYTES) {
       throw new Error(`压缩包资源超过 ${MAX_ARCHIVE_ENTRY_BYTES / 1024 / 1024} MiB 限制：${normalized}`);
     }
-    return buffer(await openEntryStream(this.archive, entry));
+    return readStream(await openEntryStream(archived.archive, archived.entry));
   }
 
   close(): void {
-    this.archive?.close();
+    for (const archive of this.archives) archive.close();
   }
 }
 
@@ -67,11 +81,14 @@ export async function resolveDataDirectory(input: string): Promise<string> {
 
 async function indexLooseFiles(root: string): Promise<Map<string, string>> {
   const result = new Map<string, string>();
-  const imagesDirectory = path.join(root, "images");
-  await walk(imagesDirectory, async (absolutePath) => {
-    const key = normalizeKey(path.relative(root, absolutePath));
-    result.set(key, absolutePath);
-  });
+  for (const directoryName of ["images", "bigportraits"]) {
+    const directory = path.join(root, directoryName);
+    if (!await exists(directory)) continue;
+    await walk(directory, async (absolutePath) => {
+      const key = normalizeKey(path.relative(root, absolutePath));
+      result.set(key, absolutePath);
+    });
+  }
   return result;
 }
 
@@ -106,13 +123,28 @@ function openZip(filename: string): Promise<ZipFile> {
 function indexZip(zip: ZipFile): Promise<Map<string, Entry>> {
   return new Promise((resolve, reject) => {
     const entries = new Map<string, Entry>();
+    let settled = false;
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
     zip.on("entry", (entry: Entry) => {
-      const key = normalizeKey(entry.fileName);
-      if (!key.endsWith("/")) entries.set(key, entry);
-      zip.readEntry();
+      if (settled) return;
+      try {
+        const key = normalizeKey(entry.fileName);
+        if (!key.endsWith("/")) entries.set(key, entry);
+        zip.readEntry();
+      } catch (error) {
+        fail(error instanceof Error ? error : new Error(String(error)));
+      }
     });
-    zip.once("end", () => resolve(entries));
-    zip.once("error", reject);
+    zip.once("end", () => {
+      if (settled) return;
+      settled = true;
+      resolve(entries);
+    });
+    zip.once("error", fail);
     zip.readEntry();
   });
 }
@@ -124,5 +156,16 @@ function openEntryStream(zip: ZipFile, entry: Entry): Promise<Readable> {
       else if (!stream) reject(new Error(`无法读取 ZIP 资源：${entry.fileName}`));
       else resolve(stream);
     });
+  });
+}
+
+function readStream(stream: Readable): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    stream.on("data", (chunk: Buffer | string) => {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    });
+    stream.once("end", () => resolve(Buffer.concat(chunks)));
+    stream.once("error", reject);
   });
 }

@@ -28,7 +28,13 @@ const compressionNames = new Map<number, KtexCompression>([
 const MAX_DIMENSION = 16_384;
 const MAX_DECODED_BYTES = 512 * 1024 * 1024;
 
-export function decodeKtex(input: Uint8Array): DecodedKtex {
+export type KtexDecodeOptions = {
+  /** Default true for sprite/UI PNGs. Ground shaders sample stored RGB directly
+   * and multiply by alpha themselves; use false for those texture assets. */
+  unpremultiplyAlpha?: boolean;
+};
+
+export function decodeKtex(input: Uint8Array, options: KtexDecodeOptions = {}): DecodedKtex {
   const source = Buffer.from(input.buffer, input.byteOffset, input.byteLength);
   if (source.length < 18 || source.subarray(0, 4).toString("ascii") !== "KTEX") {
     throw new Error("输入不是有效的 KTEX 文件");
@@ -75,7 +81,7 @@ export function decodeKtex(input: Uint8Array): DecodedKtex {
   const mipmap = mipmaps.reduce((largest, current) =>
     current.width * current.height > largest.width * largest.height ? current : largest, firstMipmap);
   let rgba = decodePixels(mipmap, compression);
-  demultiplyAlpha(rgba);
+  if (options.unpremultiplyAlpha !== false) demultiplyAlpha(rgba);
   rgba = flipVertically(rgba, mipmap.width, mipmap.height);
 
   return {
