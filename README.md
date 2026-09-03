@@ -20,9 +20,14 @@ used by QiNeko Wiki.
 - Parse Atlas XML files and extract their elements as PNG images.
 - Read loose game image resources together with `data/databundles/images.zip`.
 - Load Simplified Chinese asset names and recipe descriptions.
+- Decode ANIM v3/v4 and BILD v5/v6 files with bounded binary reads.
+- Inspect self-contained animation ZIP files and render PNG frames or frame
+  sequences through an experimental renderer.
 - Use the library programmatically or through the `dst` CLI.
 
-Animation (`build.bin` and `anim.bin`) support is planned next.
+The current animation renderer supports the common rectangular symbol case.
+Exact triangle-mesh clipping and broader real-world compatibility remain under
+active validation.
 
 ## Requirements
 
@@ -53,6 +58,21 @@ pnpm dev game "/path/to/Don't Starve Together" \
   --output ./output
 ```
 
+Inspect and render an animation ZIP:
+
+```bash
+pnpm dev anim inspect ./firefighter_projectile.zip
+pnpm dev anim frame ./firefighter_projectile.zip \
+  --animation spin_loop \
+  --frame 3 \
+  --scale 4 \
+  --output ./output/firefighter-projectile.png
+pnpm dev anim frames ./firefighter_projectile.zip \
+  --animation spin_loop \
+  --scale 4 \
+  --output ./output/firefighter-projectile-frames
+```
+
 ## Library usage
 
 ```ts
@@ -63,6 +83,7 @@ Focused subpath exports are also available:
 
 ```ts
 import { parseAtlasXml } from "dstjs/atlas";
+import { openAnimationBundle, renderAnimationFrame } from "dstjs/animation";
 import { GameAssetSource } from "dstjs/game";
 import { decodeKtex } from "dstjs/texture";
 ```

@@ -12,7 +12,8 @@
   "files": [
     "dist",
     "README.md",
-    "NOTICE.md"
+    "NOTICE.md",
+    "third_party"
   ],
   "bin": {
     "dst": "./dist/cli.js"
@@ -25,6 +26,10 @@
     "./atlas": {
       "types": "./dist/atlas/index.d.ts",
       "default": "./dist/atlas/index.js"
+    },
+    "./animation": {
+      "types": "./dist/animation/index.d.ts",
+      "default": "./dist/animation/index.js"
     },
     "./game": {
       "types": "./dist/game/index.d.ts",

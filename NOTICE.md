@@ -14,3 +14,7 @@ Runtime dependencies retain their respective licenses:
 - `gettext-parser`: MIT
 - `sharp`: Apache-2.0
 - `yauzl`: MIT
+
+The ANIM and BILD binary implementation was developed with reference to the
+MIT-licensed [Akarinnnnn/KleiAnim](https://github.com/Akarinnnnn/KleiAnim)
+project. Its license text is included in `third_party/KleiAnim-LICENSE`.

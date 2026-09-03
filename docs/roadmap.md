@@ -16,11 +16,11 @@ breaking change.
 
 ## Phase 1: animation decoding
 
-- [ ] Add bounded binary reader primitives with explicit endianness.
-- [ ] Decode `build.bin` into builds, symbols, frames, and atlas references.
-- [ ] Decode `anim.bin` into banks, animations, frames, and elements.
-- [ ] Preserve raw hashes and affine transforms without lossy decomposition.
-- [ ] Open animation ZIP files through a safe resource-source abstraction.
+- [x] Add bounded binary reader primitives with explicit endianness.
+- [x] Decode `build.bin` into builds, symbols, frames, and atlas references.
+- [x] Decode `anim.bin` into banks, animations, frames, and elements.
+- [x] Preserve raw hashes and affine transforms without lossy decomposition.
+- [x] Open animation ZIP files through a safe resource-source abstraction.
 - [ ] Validate results against multiple independently implemented tools.
 
 ## Phase 2: animation composition
@@ -28,7 +28,8 @@ breaking change.
 - [ ] Resolve build symbols and animation element references.
 - [ ] Evaluate poses at a frame or timestamp.
 - [ ] Support symbol overrides, hidden layers, and build swaps.
-- [ ] Render poses and frame sequences to PNG.
+- [x] Render common rectangular poses and stable-size frame sequences to PNG.
+- [ ] Render exact build triangle meshes and clipping masks.
 - [ ] Establish documented coordinate, origin, and z-order conventions.
 
 ## Phase 3: conversion and encoding

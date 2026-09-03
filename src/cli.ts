@@ -3,6 +3,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { animationBounds, openAnimationBundle, renderAnimationFrame } from "./animation/index.js";
 import { extractAtlas, extractAtlasFiles, type AtlasManifest } from "./atlas/extract.js";
 import { GameAssetSource } from "./game/source.js";
 
@@ -12,6 +13,10 @@ type Arguments = {
   output: string;
   matches: string[];
   texture: string | null;
+  animation: string | null;
+  bank: string | null;
+  frame: number;
+  scale: number;
 };
 
 async function main(): Promise<void> {
@@ -33,6 +38,66 @@ async function main(): Promise<void> {
     if (!gamePath) return printUsage(1);
     await extractGame(path.resolve(gamePath), path.resolve(arguments_.output), arguments_.matches);
     return;
+  }
+
+  if (arguments_.command === "anim") {
+    const [action, archivePath] = arguments_.positional;
+    if (!action || !archivePath) return printUsage(1);
+    const bundle = await openAnimationBundle(path.resolve(archivePath));
+    if (action === "inspect") {
+      console.log(JSON.stringify({
+        build: bundle.build.name,
+        atlases: bundle.build.atlases,
+        symbols: bundle.build.symbols.length,
+        animations: bundle.animation.animations.map((animation) => ({
+          name: animation.name,
+          bank: animation.bankName,
+          facing: animation.facing,
+          frameRate: animation.frameRate,
+          frames: animation.frames.length,
+          duration: animation.frames.length / animation.frameRate,
+        })),
+      }, null, 2));
+      return;
+    }
+    if (!arguments_.animation) throw new Error(`${action} 操作需要 --animation`);
+    if (action === "frame") {
+      const rendered = await renderAnimationFrame(bundle, {
+        animation: arguments_.animation,
+        bank: arguments_.bank ?? undefined,
+        frameIndex: arguments_.frame,
+        scale: arguments_.scale,
+      });
+      const outputPath = path.resolve(arguments_.output.endsWith(".png")
+        ? arguments_.output
+        : path.join(arguments_.output, `${arguments_.animation}-${arguments_.frame}.png`));
+      await mkdir(path.dirname(outputPath), { recursive: true });
+      await writeFile(outputPath, rendered.png);
+      console.log(`已输出 ${outputPath}（${rendered.width}x${rendered.height}）。`);
+      return;
+    }
+    if (action === "frames") {
+      const animation = bundle.animation.animations.find((candidate) =>
+        candidate.name === arguments_.animation
+        && (arguments_.bank === null || candidate.bankName === arguments_.bank));
+      if (!animation) throw new Error(`找不到动画 ${arguments_.animation}`);
+      const outputDirectory = path.resolve(arguments_.output);
+      const bounds = animationBounds(animation);
+      await mkdir(outputDirectory, { recursive: true });
+      for (let frameIndex = 0; frameIndex < animation.frames.length; frameIndex += 1) {
+        const rendered = await renderAnimationFrame(bundle, {
+          animation: arguments_.animation,
+          bank: arguments_.bank ?? undefined,
+          frameIndex,
+          scale: arguments_.scale,
+          bounds,
+        });
+        await writeFile(path.join(outputDirectory, `${frameIndex.toString().padStart(6, "0")}.png`), rendered.png);
+      }
+      console.log(`已输出 ${animation.frames.length} 帧到 ${outputDirectory}。`);
+      return;
+    }
+    throw new Error(`未知 anim 操作：${action}`);
   }
 
   printUsage(arguments_.command === "help" ? 0 : 1);
@@ -87,14 +152,30 @@ function parseArguments(values: string[]): Arguments {
   const matches: string[] = [];
   let output = "output";
   let texture: string | null = null;
+  let animation: string | null = null;
+  let bank: string | null = null;
+  let frame = 0;
+  let scale = 1;
   for (let index = 0; index < rest.length; index += 1) {
     const value = rest[index];
-    if (value === "--output" || value === "--tex" || value === "--match") {
+    if (
+      value === "--output"
+      || value === "--tex"
+      || value === "--match"
+      || value === "--animation"
+      || value === "--bank"
+      || value === "--frame"
+      || value === "--scale"
+    ) {
       const optionValue = rest[index + 1];
       if (!optionValue) throw new Error(`${value} 缺少参数`);
       if (value === "--output") output = optionValue;
       else if (value === "--tex") texture = optionValue;
-      else matches.push(optionValue);
+      else if (value === "--match") matches.push(optionValue);
+      else if (value === "--animation") animation = optionValue;
+      else if (value === "--bank") bank = optionValue;
+      else if (value === "--frame") frame = parseNumberOption(value, optionValue, true);
+      else scale = parseNumberOption(value, optionValue, false);
       index += 1;
     } else if (value?.startsWith("--")) {
       throw new Error(`未知参数：${value}`);
@@ -102,17 +183,30 @@ function parseArguments(values: string[]): Arguments {
       positional.push(value);
     }
   }
-  return { command, positional, output, matches, texture };
+  return { command, positional, output, matches, texture, animation, bank, frame, scale };
+}
+
+function parseNumberOption(option: string, raw: string, integer: boolean): number {
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0 || (integer && !Number.isInteger(value))) {
+    throw new Error(`${option} 不是有效的${integer ? "非负整数" : "非负数字"}：${raw}`);
+  }
+  return value;
 }
 
 function printUsage(exitCode: number): void {
   console.log(`用法：
   dst atlas <atlas.xml> [--tex <texture.tex>] [--output <目录>]
   dst game <游戏目录或data目录> [--match <名称>]... [--output <目录>]
+  dst anim inspect <animation.zip>
+  dst anim frame <animation.zip> --animation <名称> [--frame <序号>] [--scale <倍数>] [--output <PNG>]
+  dst anim frames <animation.zip> --animation <名称> [--scale <倍数>] [--output <目录>]
 
 示例：
   dst game "/path/to/Don't Starve Together" --match inventoryimages
-  dst atlas ./inventoryimages.xml --tex ./inventoryimages.tex`);
+  dst atlas ./inventoryimages.xml --tex ./inventoryimages.tex
+  dst anim inspect ./wet_meter.zip
+  dst anim frame ./wet_meter.zip --animation idle --frame 0 --output ./wet-meter.png`);
   process.exitCode = exitCode;
 }
 

@@ -13,6 +13,21 @@ Electron desktop application.
 No game images, textures, animation archives, or other Klei assets are included
 in DST.js. Automated tests use synthetic inputs created by the test suite.
 
+The first ANIM/BILD decoder implementation was independently written in
+TypeScript on 2026-08-25. During implementation, the following existing tools
+were consulted to understand and validate the binary layout:
+
+- `Akarinnnnn/KleiAnim`, MIT licensed. Its attribution and license are retained
+  in `NOTICE.md` and `third_party/KleiAnim-LICENSE`.
+- The local GPL-licensed `ktools` checkout was reviewed as a behavioral and
+  format reference. No C++ source file was copied into DST.js. The public
+  release audit must still compare structure and expression carefully before
+  selecting a DST.js license.
+
+Real `wet_meter.zip` and `firefighter_projectile.zip` files from the developer's
+local game installation were used only for local validation. Generated PNG and
+GIF files remain under the ignored `output/` directory and are not committed.
+
 ## Public release blockers
 
 - Review the history and authorship of every migrated source file.
