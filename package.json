@@ -20,7 +20,7 @@
     "third_party"
   ],
   "bin": {
-    "dst": "./dist/cli.js"
+    "dst": "dist/cli.js"
   },
   "exports": {
     ".": {
@@ -47,6 +47,14 @@
       "types": "./dist/image/index.d.ts",
       "default": "./dist/image/index.js"
     },
+    "./lottie": {
+      "types": "./dist/lottie/index.d.ts",
+      "default": "./dist/lottie/index.js"
+    },
+    "./sprite-animation": {
+      "types": "./dist/sprite-animation/index.d.ts",
+      "default": "./dist/sprite-animation/index.js"
+    },
     "./texture": {
       "types": "./dist/texture/index.d.ts",
       "default": "./dist/texture/index.js"
@@ -62,6 +70,7 @@
   },
   "scripts": {
     "build": "pnpm clean && tsc -p tsconfig.build.json",
+    "build:watch": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "dev": "tsx src/cli.ts",

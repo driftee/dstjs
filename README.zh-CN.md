@@ -139,6 +139,43 @@ pnpm dev turf mod-catalog \
 
 所有游戏资源均从用户提供的本地文件读取，不随 npm 包分发。
 
+导出 Lottie JSON：
+
+```bash
+pnpm dev anim lottie ./shadow_skittish.zip \
+  --animation idle_loop \
+  --output ./output/shadow-skittish.lottie.json
+
+pnpm dev anim lottie ./shadow_skittish.zip \
+  --animation idle_loop \
+  --external-images \
+  --output ./output/shadow-skittish/animation.json
+
+pnpm dev anim lottie ./shadow_skittish.zip \
+  --animation idle_loop \
+  --keyframe-mode visual \
+  --keyframe-tolerance 0.25 \
+  --output ./output/shadow-skittish-visual.lottie.json
+
+```
+
+通用 Sprite Animation IR 可供 Web、Lottie 和后续 DST 反向编译器共同使用。
+每个 IR Transform 同时包含作为保真基线的仿射 `matrix`，以及供编辑器使用的
+`channels`（`position`、`rotation`、`scale` 和 `skewX`）。公共 Transform
+helper 负责从导入矩阵分解通道，并在通道编辑后重新合成矩阵，使渲染器保留源数据，
+未来的编辑器也能共用同一套变换模型。
+
+Lottie 导出器会确定性地匹配跨帧元素，并分别支持以下关键帧模式：
+
+- `lossless` 或 `0`：逐帧 Hold Keyframe，无损且为默认模式。
+- `linear` 或 `1`：只合并能够精确线性重建的区间。
+- `visual` 或 `2`：按 Sprite 四角的屏幕像素误差简化，
+  `--keyframe-tolerance` 默认为 `0.25` 像素。
+
+当 Sprite 或绘制顺序改变时会切分图层。普通仿射斜切通过 Lottie 的 `sk` / `sa`
+通道保留；只有编辑通道无法重建的退化矩阵才会明确报错。
+使用 `--external-images` 可将图片按内容哈希输出到 `images/`，避免 Base64 内嵌。
+
 ## 程序调用
 
 ```ts
@@ -151,7 +188,9 @@ import { decodeKtex, parseAtlasXml } from "@driftee/dstjs";
 import { parseAtlasXml } from "@driftee/dstjs/atlas";
 import { openAnimationBundle, renderAnimationFrame } from "@driftee/dstjs/animation";
 import { GameAssetSource } from "@driftee/dstjs/game";
+import { compileLottieAnimation } from "@driftee/dstjs/lottie";
 import { pruneTransparentImage } from "@driftee/dstjs/image";
+import { compileDstSpriteAnimation } from "@driftee/dstjs/sprite-animation";
 import { decodeKtex } from "@driftee/dstjs/texture";
 import { compileWebAnimation, createPetalSceneHtml } from "@driftee/dstjs/web-animation";
 ```

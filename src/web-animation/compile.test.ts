@@ -5,7 +5,8 @@ import type { AnimationBundle } from "../animation/archive.js";
 import { parseAnimation } from "../animation/parse-animation.js";
 import { parseBuild } from "../animation/parse-build.js";
 import { createAnimationBinary, createBuildBinary } from "../animation/test-helpers.js";
-import { compileWebAnimation } from "./compile.js";
+import { compileDstSpriteAnimation } from "../sprite-animation/compile-dst.js";
+import { compileWebAnimation, compileWebAnimationPackage } from "./compile.js";
 import { createAnimationPlayerHtml } from "./player.js";
 import { createPetalSceneHtml } from "./scene.js";
 
@@ -62,6 +63,18 @@ describe("Web animation compiler", () => {
 
     expect(Object.keys(result.manifest.sprites)).toEqual(["5:0"]);
     expect(result.manifest.animations.idle?.frames[0]?.elements[0]?.sprite).toBe("5:0");
+  });
+
+  it("compiles the target-neutral sprite animation package into the existing Web format", async () => {
+    const animationPackage = await compileDstSpriteAnimation(createBundle());
+    const result = await compileWebAnimationPackage(animationPackage);
+
+    expect(result.manifest.animations.idle?.frames[0]?.elements[0]).toMatchObject({
+      sprite: "3:0",
+      transform: [1, 0, 0, 1, 0, 0],
+      z: 0,
+    });
+    expect(Object.keys(result.manifest.sprites)).toEqual(["3:0"]);
   });
 
   it("creates a standalone two-layer scene with interactive controls", async () => {

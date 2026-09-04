@@ -3,6 +3,8 @@ export * from "./animation/index.js";
 export * from "./cooking/index.js";
 export * from "./game/index.js";
 export * from "./image/index.js";
+export * from "./lottie/index.js";
+export * from "./sprite-animation/index.js";
 export * from "./texture/index.js";
 export * from "./turf/index.js";
 export * from "./web-animation/index.js";

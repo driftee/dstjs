@@ -1,6 +1,6 @@
 import sharp from "sharp";
 
-import { rasterizeBuildFrame, type RasterizedBuildFrame } from "../web-animation/mesh.js";
+import { rasterizeBuildFrame, type RasterizedBuildFrame } from "../sprite-animation/rasterize.js";
 import type { AnimationBundle, BuildBundle } from "./archive.js";
 import type { Animation, AnimationElement, BuildFrame, BuildSymbol, Rectangle } from "./types.js";
 
@@ -243,7 +243,7 @@ type RasterizedSprite = RasterizedBuildFrame & {
   source: string;
 };
 
-function selectBuildFrame(
+export function selectBuildFrame(
   symbol: BuildSymbol,
   requestedFrame: number,
   skipMissing = false,

@@ -16,6 +16,13 @@ import { extractAtlas, extractAtlasFiles, type AtlasManifest } from "./atlas/ext
 import { writeCookingCatalog } from "./cooking/index.js";
 import { GameAssetSource } from "./game/source.js";
 import { pruneTransparentImage, type PruneOutputFormat } from "./image/index.js";
+import {
+  compileLottiePackage,
+  normalizeLottieKeyframeMode,
+  stringifyLottieAnimation,
+  type LottieKeyframeMode,
+} from "./lottie/index.js";
+import { compileDstSpriteAnimation } from "./sprite-animation/index.js";
 import { convertKtexToPng } from "./texture/index.js";
 import {
   captureCoastCalibration,
@@ -62,6 +69,9 @@ type Arguments = {
   variants: string[];
   demo: boolean;
   player: boolean;
+  externalImages: boolean;
+  keyframeMode: LottieKeyframeMode;
+  keyframeTolerance: number;
   skipMissingSymbols: boolean;
   hiddenLayers: string[];
   title: string | null;
@@ -356,6 +366,38 @@ async function main(): Promise<void> {
       if (arguments_.player) console.log(`动画播放器：${path.join(outputDirectory, "index.html")}`);
       return;
     }
+    if (action === "lottie") {
+      const animationName = requireSingleAnimation(arguments_.animations, action);
+      const spriteAnimation = await compileDstSpriteAnimation(bundle, {
+        animations: [animationName],
+        bank: arguments_.bank ?? undefined,
+        facing: arguments_.facing ?? undefined,
+        symbolOverrides: parseOverrides(arguments_.overrides),
+        skipMissingSymbols: arguments_.skipMissingSymbols,
+      });
+      const lottiePackage = compileLottiePackage(spriteAnimation, {
+        clip: animationName,
+        padding: arguments_.padding ?? undefined,
+        embedImages: !arguments_.externalImages,
+        keyframeMode: arguments_.keyframeMode,
+        visualTolerance: arguments_.keyframeTolerance,
+      });
+      const lottie = lottiePackage.animation;
+      const outputPath = path.resolve(arguments_.output.endsWith(".json")
+        ? arguments_.output
+        : path.join(arguments_.output, `${animationName}.lottie.json`));
+      await mkdir(path.dirname(outputPath), { recursive: true });
+      await Promise.all([
+        writeFile(outputPath, `${stringifyLottieAnimation(lottie, 2)}\n`, "utf8"),
+        ...[...lottiePackage.images].map(async ([relativePath, image]) => {
+          const imagePath = path.join(path.dirname(outputPath), relativePath);
+          await mkdir(path.dirname(imagePath), { recursive: true });
+          await writeFile(imagePath, image);
+        }),
+      ]);
+      console.log(`已输出 ${outputPath}（${lottie.w}x${lottie.h}，${lottie.op} 帧，${lottie.layers.length} 个图层，${lottiePackage.images.size} 个外置图片）。`);
+      return;
+    }
     const animationName = requireSingleAnimation(arguments_.animations, action);
     if (action === "frame") {
       const rendered = await renderAnimationFrame(bundle, {
@@ -496,6 +538,9 @@ function parseArguments(values: string[]): Arguments {
   const variants: string[] = [];
   let demo = false;
   let player = false;
+  let externalImages = false;
+  let keyframeMode: LottieKeyframeMode = "lossless";
+  let keyframeTolerance = 0.25;
   let skipMissingSymbols = false;
   const hiddenLayers: string[] = [];
   let title: string | null = null;
@@ -507,6 +552,10 @@ function parseArguments(values: string[]): Arguments {
     }
     if (value === "--player") {
       player = true;
+      continue;
+    }
+    if (value === "--external-images") {
+      externalImages = true;
       continue;
     }
     if (value === "--skip-missing-symbols") {
@@ -532,6 +581,8 @@ function parseArguments(values: string[]): Arguments {
       || value === "--padding-bottom"
       || value === "--padding-left"
       || value === "--alpha-threshold"
+      || value === "--keyframe-mode"
+      || value === "--keyframe-tolerance"
       || value === "--hide-layer"
       || value === "--override"
       || value === "--variant"
@@ -556,6 +607,11 @@ function parseArguments(values: string[]): Arguments {
       else if (value === "--padding-bottom") paddingBottom = parseNumberOption(value, optionValue, true);
       else if (value === "--padding-left") paddingLeft = parseNumberOption(value, optionValue, true);
       else if (value === "--alpha-threshold") alphaThreshold = parseNumberOption(value, optionValue, true);
+      else if (value === "--keyframe-mode") keyframeMode = parseKeyframeMode(optionValue);
+      else if (value === "--keyframe-tolerance") {
+        keyframeTolerance = parseNumberOption(value, optionValue, false);
+        if (keyframeTolerance <= 0) throw new Error(`${value} 必须大于 0`);
+      }
       else if (value === "--hide-layer") hiddenLayers.push(optionValue);
       else if (value === "--override") overrides.push(optionValue);
       else if (value === "--title") title = optionValue;
@@ -591,10 +647,20 @@ function parseArguments(values: string[]): Arguments {
     variants,
     demo,
     player,
+    externalImages,
+    keyframeMode,
+    keyframeTolerance,
     skipMissingSymbols,
     hiddenLayers,
     title,
   };
+}
+
+function parseKeyframeMode(raw: string): LottieKeyframeMode {
+  if (raw === "0" || raw === "1" || raw === "2") {
+    return normalizeLottieKeyframeMode(Number(raw) as 0 | 1 | 2);
+  }
+  return normalizeLottieKeyframeMode(raw as LottieKeyframeMode);
 }
 
 function requireSingleAnimation(animations: string[], action: string): string {
@@ -668,6 +734,7 @@ function printUsage(exitCode: number): void {
   dst anim frame <animation.zip> --animation <名称> [--build <build.zip>] [--override-build <build.zip>]... [--bank <bank>] [--facing <编号>] [--override <原名=目标名>]... [--hide-layer <名称>]... [--skip-missing-symbols] [--frame <序号>] [--scale <倍数>] [--output <PNG>]
   dst anim frames <animation.zip> --animation <名称> [--build <build.zip>] [--override-build <build.zip>]... [--bank <bank>] [--facing <编号>] [--override <原名=目标名>]... [--hide-layer <名称>]... [--skip-missing-symbols] [--scale <倍数>] [--output <目录>]
   dst anim gif <animation.zip> --animation <名称> [--build <build.zip>] [--override-build <build.zip>]... [--bank <bank>] [--facing <编号>] [--override <原名=目标名>]... [--hide-layer <名称>]... [--skip-missing-symbols] [--scale <倍数>] [--output <GIF>]
+  dst anim lottie <animation.zip> --animation <名称> [--build <build.zip>] [--bank <bank>] [--facing <编号>] [--override <原名=目标名>]... [--skip-missing-symbols] [--padding <像素>] [--external-images] [--keyframe-mode <lossless|linear|visual|0|1|2>] [--keyframe-tolerance <像素>] [--output <JSON>]
   dst anim web <animation.zip> [--animation <名称>]... [--build <build.zip>] [--override <原名=目标名>]... [--variant <名称:原名=目标名>]... [--demo | --player] [--title <标题>] [--output <目录>]
 
 示例：
@@ -690,6 +757,9 @@ function printUsage(exitCode: number): void {
   dst anim frame ./wet_meter.zip --animation idle --frame 0 --output ./wet-meter.png
   dst anim inspect --anim ./ds_pig_basic.zip
   dst anim gif --anim ./ds_pig_basic.zip --build ./pig_build.zip --animation idle_loop --facing 8 --hide-layer ARM_carry --hide-layer ARM_carry_up --skip-missing-symbols --output ./pig-idle.gif
+  dst anim lottie ./shadow_skittish.zip --animation idle_loop --output ./shadow-skittish.lottie.json
+  dst anim lottie ./shadow_skittish.zip --animation idle_loop --external-images --output ./shadow-skittish/animation.json
+  dst anim lottie ./shadow_skittish.zip --animation idle_loop --keyframe-mode visual --keyframe-tolerance 0.25 --output ./shadow-skittish-visual.lottie.json
   dst anim web ./shadow_skittish.zip --animation idle_loop --animation disappear --player --title "Mr. Skitts" --output ./mr-skitts
   dst anim web ./cherrytree_petal_fx.zip --override autumn=spring --variant spring:autumn=spring --variant autumn:autumn=autumn --demo --output ./cherry-web`);
   process.exitCode = exitCode;

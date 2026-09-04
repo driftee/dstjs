@@ -201,6 +201,21 @@ pnpm dev anim gif \
   --scale 2 \
   --output ./output/pig-idle.gif
 
+pnpm dev anim lottie ./shadow_skittish.zip \
+  --animation idle_loop \
+  --output ./output/shadow-skittish.lottie.json
+
+pnpm dev anim lottie ./shadow_skittish.zip \
+  --animation idle_loop \
+  --external-images \
+  --output ./output/shadow-skittish/animation.json
+
+pnpm dev anim lottie ./shadow_skittish.zip \
+  --animation idle_loop \
+  --keyframe-mode visual \
+  --keyframe-tolerance 0.25 \
+  --output ./output/shadow-skittish-visual.lottie.json
+
 pnpm dev anim web ./cherrytree_petal_fx.zip \
   --override autumn=spring \
   --variant spring:autumn=spring \
@@ -217,6 +232,23 @@ The `anim web` command writes `animation.json` and `atlas.webp`. With `--demo`,
 it also writes a self-contained `index.html` that demonstrates scene
 orchestration independently of any Wiki implementation.
 
+The target-neutral sprite animation package is also available as a public API.
+Each IR transform contains both an authoritative affine `matrix` and editable
+`channels` (`position`, `rotation`, `scale`, and `skewX`). Public transform
+helpers decompose imported matrices and recompose matrices after channel edits,
+so renderers retain source fidelity while future editors share one transform
+model.
+
+The Lottie exporter deterministically tracks matching elements across frames.
+Its keyframe modes are `lossless`/`0` for per-frame hold keyframes (the
+default), `linear`/`1` for exact linear interval merging, and `visual`/`2` for
+pixel-error simplification. `--keyframe-tolerance` controls the visual mode and
+defaults to `0.25` pixels. The exporter splits a layer when its sprite or draw
+order changes, preserves affine skew through Lottie's `sk`/`sa` channels, and
+rejects only degenerate matrices that the editable channel model cannot
+reproduce. Use `--external-images` to write content-addressed PNG files under
+`images/` instead of embedding them as Base64.
+
 ## Library usage
 
 ```ts
@@ -229,7 +261,9 @@ Focused subpath exports are also available:
 import { parseAtlasXml } from "@driftee/dstjs/atlas";
 import { openAnimationBundle, renderAnimationFrame } from "@driftee/dstjs/animation";
 import { GameAssetSource } from "@driftee/dstjs/game";
+import { compileLottieAnimation } from "@driftee/dstjs/lottie";
 import { pruneTransparentImage } from "@driftee/dstjs/image";
+import { compileDstSpriteAnimation } from "@driftee/dstjs/sprite-animation";
 import { decodeKtex } from "@driftee/dstjs/texture";
 import { compileWebAnimation, createPetalSceneHtml } from "@driftee/dstjs/web-animation";
 ```
