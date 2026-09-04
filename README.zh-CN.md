@@ -163,7 +163,8 @@ pnpm dev anim lottie ./shadow_skittish.zip \
 每个 IR Transform 同时包含作为保真基线的仿射 `matrix`，以及供编辑器使用的
 `channels`（`position`、`rotation`、`scale` 和 `skewX`）。公共 Transform
 helper 负责从导入矩阵分解通道，并在通道编辑后重新合成矩阵，使渲染器保留源数据，
-未来的编辑器也能共用同一套变换模型。
+未来的编辑器也能共用同一套变换模型。这些平台无关的类型与算法位于
+`@driftee/dstjs-core`，当前包仍会兼容性地重新导出。
 
 Lottie 导出器会确定性地匹配跨帧元素，并分别支持以下关键帧模式：
 

@@ -70,9 +70,10 @@ export function compileLottiePackage(
     if (!asset) throw new Error(`找不到 Sprite ${spriteId}`);
     const image = animationPackage.images.get(spriteId);
     if (!image) throw new Error(`Sprite ${spriteId} 缺少图片数据`);
+    const imageBuffer = Buffer.from(image);
     if (!embedImages) {
-      const filename = `${createHash("sha256").update(image).digest("hex")}.png`;
-      images.set(`${imageDirectory}${filename}`, image);
+      const filename = `${createHash("sha256").update(imageBuffer).digest("hex")}.png`;
+      images.set(`${imageDirectory}${filename}`, imageBuffer);
       return {
         id: spriteId,
         w: asset.width,
@@ -87,7 +88,7 @@ export function compileLottiePackage(
       w: asset.width,
       h: asset.height,
       u: "",
-      p: `data:${asset.mimeType};base64,${image.toString("base64")}`,
+      p: `data:${asset.mimeType};base64,${imageBuffer.toString("base64")}`,
       e: 1,
     };
   });

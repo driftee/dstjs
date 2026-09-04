@@ -1,0 +1,38 @@
+{
+  "name": "@driftee/dstjs-core",
+  "version": "0.1.0",
+  "description": "Platform-neutral animation formats and algorithms for DST.js.",
+  "type": "module",
+  "license": "MIT",
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "README.zh-CN.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./sprite-animation": {
+      "types": "./dist/sprite-animation/index.d.ts",
+      "default": "./dist/sprite-animation/index.js"
+    },
+    "./web-animation": {
+      "types": "./dist/web-animation/index.d.ts",
+      "default": "./dist/web-animation/index.js"
+    }
+  },
+  "scripts": {
+    "build": "pnpm clean && tsc -p tsconfig.build.json",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "watch:self": "tsc -p tsconfig.build.json --watch --preserveWatchOutput"
+  }
+}

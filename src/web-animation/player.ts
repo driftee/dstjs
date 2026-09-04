@@ -32,7 +32,7 @@ export function createAnimationPlayerHtml(
       name,
       animationBounds(animationPackage.manifest, clip),
     ])),
-    atlas: `data:image/webp;base64,${animationPackage.atlas.toString("base64")}`,
+    atlas: `data:image/webp;base64,${Buffer.from(animationPackage.atlas).toString("base64")}`,
   }).replaceAll("<", "\\u003c");
   const animationOptions = animationNames.map((name) =>
     `<option value="${escapeHtml(name)}"${name === initialAnimation ? " selected" : ""}>${escapeHtml(name)}</option>`).join("");

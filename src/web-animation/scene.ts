@@ -28,7 +28,7 @@ export function createPetalSceneHtml(
   }
   const packagesJson = JSON.stringify(Object.fromEntries(Object.entries(variants).map(([name, variant]) => [name, {
     manifest: variant.manifest,
-    atlas: `data:image/webp;base64,${variant.atlas.toString("base64")}`,
+    atlas: `data:image/webp;base64,${Buffer.from(variant.atlas).toString("base64")}`,
   }]))).replaceAll("<", "\\u003c");
   const variantOptions = variantNames.map((name) =>
     `<option value="${escapeHtml(name)}"${name === initialVariant ? " selected" : ""}>${escapeHtml(name)}</option>`).join("");

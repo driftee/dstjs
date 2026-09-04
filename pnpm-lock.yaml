@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@driftee/dstjs-core':
+        specifier: ^0.1.0
+        version: link:packages/core
       decode-dxt:
         specifier: 1.0.1
         version: 1.0.1
@@ -54,6 +57,8 @@ importers:
       vitest:
         specifier: 4.1.11
         version: 4.1.11(@types/node@22.20.1)(vite@8.2.2(@types/node@22.20.1)(esbuild@0.28.2)(tsx@4.23.12))
+
+  packages/core: {}
 
 packages:
 

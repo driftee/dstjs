@@ -65,7 +65,7 @@ export async function compileWebAnimationPackage(
     if (!png) throw new Error(`Sprite ${key} 缺少图片数据`);
     spriteSources.push({
       key,
-      png,
+      png: Buffer.from(png),
       width: asset.width,
       height: asset.height,
       originX: asset.originX,

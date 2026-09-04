@@ -1,6 +1,6 @@
 {
   "name": "@driftee/dstjs",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "A TypeScript toolkit for parsing, extracting, converting, and rendering Don't Starve Together assets.",
   "type": "module",
   "license": "MIT",
@@ -69,17 +69,21 @@
     }
   },
   "scripts": {
-    "build": "pnpm clean && tsc -p tsconfig.build.json",
-    "build:watch": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "build": "pnpm build:core && pnpm clean:root && tsc -p tsconfig.build.json",
+    "build:core": "pnpm --dir packages/core build",
+    "build:watch": "pnpm build:core && pnpm --recursive --parallel --include-workspace-root --filter @driftee/dstjs-core --filter @driftee/dstjs run watch:self",
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
-    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
-    "dev": "tsx src/cli.ts",
+    "clean": "pnpm clean:root && pnpm --dir packages/core clean",
+    "clean:root": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "dev": "pnpm build:core && tsx src/cli.ts",
     "lint": "eslint . --max-warnings 0",
     "prepublishOnly": "pnpm check",
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "test": "pnpm build:core && vitest run",
+    "typecheck": "pnpm build:core && pnpm --dir packages/core typecheck && tsc --noEmit",
+    "watch:self": "tsc -p tsconfig.build.json --watch --preserveWatchOutput"
   },
   "dependencies": {
+    "@driftee/dstjs-core": "^0.1.0",
     "decode-dxt": "1.0.1",
     "fast-xml-parser": "5.11.0",
     "gettext-parser": "9.1.1",
