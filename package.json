@@ -69,17 +69,18 @@
     }
   },
   "scripts": {
-    "build": "pnpm build:core && pnpm clean:root && tsc -p tsconfig.build.json",
+    "build": "pnpm build:core && pnpm build:player && pnpm clean:root && tsc -p tsconfig.build.json",
     "build:core": "pnpm --dir packages/core build",
-    "build:watch": "pnpm build:core && pnpm --recursive --parallel --include-workspace-root --filter @driftee/dstjs-core --filter @driftee/dstjs run watch:self",
+    "build:player": "pnpm --dir packages/player build",
+    "build:watch": "pnpm build:core && pnpm build:player && pnpm --recursive --parallel --include-workspace-root --filter @driftee/dstjs-core --filter @driftee/dstjs-player --filter @driftee/dstjs run watch:self",
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
-    "clean": "pnpm clean:root && pnpm --dir packages/core clean",
+    "clean": "pnpm clean:root && pnpm --dir packages/core clean && pnpm --dir packages/player clean",
     "clean:root": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "dev": "pnpm build:core && tsx src/cli.ts",
     "lint": "eslint . --max-warnings 0",
     "prepublishOnly": "pnpm check",
     "test": "pnpm build:core && vitest run",
-    "typecheck": "pnpm build:core && pnpm --dir packages/core typecheck && tsc --noEmit",
+    "typecheck": "pnpm build:core && pnpm --dir packages/core typecheck && pnpm --dir packages/player typecheck && tsc --noEmit",
     "watch:self": "tsc -p tsconfig.build.json --watch --preserveWatchOutput"
   },
   "dependencies": {

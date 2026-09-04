@@ -239,6 +239,8 @@ helpers decompose imported matrices and recompose matrices after channel edits,
 so renderers retain source fidelity while future editors share one transform
 model. These platform-neutral types and algorithms live in
 `@driftee/dstjs-core`; this package re-exports them for compatibility.
+Browser playback is provided separately by the UI-free
+`@driftee/dstjs-player` Canvas runtime.
 
 The Lottie exporter deterministically tracks matching elements across frames.
 Its keyframe modes are `lossless`/`0` for per-frame hold keyframes (the

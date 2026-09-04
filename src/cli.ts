@@ -344,7 +344,7 @@ async function main(): Promise<void> {
         : {};
       await mkdir(outputDirectory, { recursive: true });
       await Promise.all([
-        writeFile(path.join(outputDirectory, "animation.json"), `${JSON.stringify(animationPackage.manifest, null, 2)}\n`, "utf8"),
+        writeFile(path.join(outputDirectory, "animation.json"), `${JSON.stringify(animationPackage.manifest)}\n`, "utf8"),
         writeFile(path.join(outputDirectory, animationPackage.manifest.atlas.file), animationPackage.atlas),
         arguments_.demo
           ? writeFile(path.join(outputDirectory, "index.html"), createPetalSceneHtml(animationPackage, {

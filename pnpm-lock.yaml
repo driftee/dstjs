@@ -60,6 +60,12 @@ importers:
 
   packages/core: {}
 
+  packages/player:
+    dependencies:
+      '@driftee/dstjs-core':
+        specifier: ^0.1.1
+        version: link:../core
+
 packages:
 
   '@emnapi/runtime@1.11.3':
