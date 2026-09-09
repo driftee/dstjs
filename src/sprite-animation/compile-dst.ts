@@ -1,4 +1,4 @@
-import type { AnimationBundle } from "../animation/archive.js";
+import type { AnimationBundle, BuildBundle } from "../animation/archive.js";
 import { selectBuildFrame, sortAnimationElementsForDraw } from "../animation/render.js";
 import type { Animation, BuildFrame, BuildSymbol } from "../animation/types.js";
 import { rasterizeBuildFrame } from "./rasterize.js";
@@ -14,7 +14,9 @@ export type CompileDstSpriteAnimationOptions = {
   bank?: string;
   facing?: number;
   symbolOverrides?: Readonly<Record<string, string>>;
+  symbolOverrideBuilds?: readonly BuildBundle[];
   skipMissingSymbols?: boolean;
+  hiddenLayers?: readonly string[];
 };
 
 export async function compileDstSpriteAnimation(
@@ -23,9 +25,32 @@ export async function compileDstSpriteAnimation(
 ): Promise<SpriteAnimationPackage> {
   const animations = selectAnimations(bundle, options);
   const symbolsByHash = new Map(bundle.build.symbols.map((symbol) => [symbol.hash, symbol]));
-  const symbolsByName = new Map(bundle.build.symbols.flatMap((symbol) =>
-    symbol.name ? [[symbol.name, symbol] as const] : []));
-  const resolvedFrames = new Map<string, { symbol: BuildSymbol; frame: BuildFrame }>();
+  const sourceAtlases = bundle.build.atlases.map((name) => {
+    const atlas = bundle.atlases.get(name);
+    if (!atlas) throw new Error(`找不到 atlas ${name}`);
+    return atlas;
+  });
+  const symbolsByName = new Map<string, {
+    symbol: BuildSymbol;
+    atlases: Parameters<typeof rasterizeBuildFrame>[1];
+  }>(bundle.build.symbols.flatMap((symbol) =>
+    symbol.name ? [[symbol.name, { symbol, atlases: sourceAtlases }] as const] : []));
+  for (const overrideBuild of options.symbolOverrideBuilds ?? []) {
+    const overrideAtlases = overrideBuild.build.atlases.map((name) => {
+      const atlas = overrideBuild.atlases.get(name);
+      if (!atlas) throw new Error(`找不到 atlas ${name}`);
+      return atlas;
+    });
+    for (const symbol of overrideBuild.build.symbols) {
+      if (symbol.name) symbolsByName.set(symbol.name, { symbol, atlases: overrideAtlases });
+    }
+  }
+  const resolvedFrames = new Map<string, {
+    symbol: BuildSymbol;
+    frame: BuildFrame;
+    atlases: Parameters<typeof rasterizeBuildFrame>[1];
+  }>();
+  const hiddenLayers = new Set(options.hiddenLayers ?? []);
 
   const clips: SpriteAnimationClip[] = animations.map((animation) => ({
     id: animationId(animation),
@@ -39,23 +64,30 @@ export async function compileDstSpriteAnimation(
         metadata: { dstHash: event.hash },
       })),
       elements: sortAnimationElementsForDraw(frame.elements).flatMap((element) => {
+        if (element.layerName && hiddenLayers.has(element.layerName)) return [];
         const originalSymbol = symbolsByHash.get(element.symbolHash);
-        if (!originalSymbol) {
-          if (options.skipMissingSymbols) return [];
-          throw new Error(`Build 中找不到 symbol 0x${element.symbolHash.toString(16)}`);
-        }
-        const overrideName = originalSymbol.name
-          ? options.symbolOverrides?.[originalSymbol.name]
+        const originalSymbolName = originalSymbol?.name ?? element.symbolName;
+        const overrideName = originalSymbolName
+          ? options.symbolOverrides?.[originalSymbolName]
           : undefined;
-        const symbol = overrideName ? symbolsByName.get(overrideName) : originalSymbol;
-        if (!symbol) {
+        const overrideSource = overrideName ? symbolsByName.get(overrideName) : undefined;
+        const symbol = overrideSource?.symbol ?? originalSymbol;
+        if (!symbol || (overrideName && !overrideSource)) {
           if (options.skipMissingSymbols) return [];
+          if (!originalSymbol && !overrideName) {
+            throw new Error(`Build 中找不到 symbol 0x${element.symbolHash.toString(16)}`);
+          }
           throw new Error(`Build 中找不到 override symbol ${overrideName}`);
         }
         const buildFrame = selectBuildFrame(symbol, element.buildFrame, options.skipMissingSymbols);
         if (!buildFrame) return [];
+        if (buildFrame.vertices.length === 0) return [];
         const spriteId = `${symbol.hash.toString(16)}:${buildFrame.frameNumber}`;
-        resolvedFrames.set(spriteId, { symbol, frame: buildFrame });
+        resolvedFrames.set(spriteId, {
+          symbol,
+          frame: buildFrame,
+          atlases: overrideSource?.atlases ?? sourceAtlases,
+        });
         const { a, b, c, d, tx, ty } = element.transform;
         return [{
           spriteId,
@@ -79,15 +111,11 @@ export async function compileDstSpriteAnimation(
     },
   }));
 
-  const sourceAtlases = bundle.build.atlases.map((name) => {
-    const atlas = bundle.atlases.get(name);
-    if (!atlas) throw new Error(`找不到 atlas ${name}`);
-    return atlas;
-  });
   const assets: Record<string, SpriteAnimationAsset> = {};
   const images = new Map<string, Buffer>();
-  for (const [id, { symbol, frame }] of [...resolvedFrames].sort(([left], [right]) => left.localeCompare(right))) {
-    const sprite = await rasterizeBuildFrame(frame, sourceAtlases);
+  for (const [id, { symbol, frame, atlases }] of [...resolvedFrames]
+    .sort(([left], [right]) => left.localeCompare(right))) {
+    const sprite = await rasterizeBuildFrame(frame, atlases);
     assets[id] = {
       id,
       name: symbol.name,

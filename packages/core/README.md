@@ -1,6 +1,6 @@
 # @driftee/dstjs-core
 
-[简体中文](./README.zh-CN.md)
+[简体中文](https://unpkg.com/@driftee/dstjs-core@0.2.0/README.zh-CN.md)
 
 Platform-neutral data formats and algorithms shared by
 [`@driftee/dstjs`](https://www.npmjs.com/package/@driftee/dstjs), browser

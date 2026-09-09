@@ -330,7 +330,12 @@ async function main(): Promise<void> {
       const outputDirectory = path.resolve(arguments_.output);
       const animationPackage = await compileWebAnimation(bundle, {
         animations: arguments_.animations,
+        bank: arguments_.bank ?? undefined,
+        facing: arguments_.facing ?? undefined,
         symbolOverrides: parseOverrides(arguments_.overrides),
+        symbolOverrideBuilds,
+        skipMissingSymbols: arguments_.skipMissingSymbols,
+        hiddenLayers: arguments_.hiddenLayers,
       });
       const variantDefinitions = parseVariants(arguments_.variants);
       const variantPackages = arguments_.demo
@@ -338,7 +343,12 @@ async function main(): Promise<void> {
           variant.name,
           await compileWebAnimation(bundle, {
             animations: arguments_.animations,
+            bank: arguments_.bank ?? undefined,
+            facing: arguments_.facing ?? undefined,
             symbolOverrides: variant.symbolOverrides,
+            symbolOverrideBuilds,
+            skipMissingSymbols: arguments_.skipMissingSymbols,
+            hiddenLayers: arguments_.hiddenLayers,
           }),
         ] as const)))
         : {};
@@ -373,6 +383,7 @@ async function main(): Promise<void> {
         bank: arguments_.bank ?? undefined,
         facing: arguments_.facing ?? undefined,
         symbolOverrides: parseOverrides(arguments_.overrides),
+        symbolOverrideBuilds,
         skipMissingSymbols: arguments_.skipMissingSymbols,
       });
       const lottiePackage = compileLottiePackage(spriteAnimation, {
@@ -735,7 +746,7 @@ function printUsage(exitCode: number): void {
   dst anim frames <animation.zip> --animation <名称> [--build <build.zip>] [--override-build <build.zip>]... [--bank <bank>] [--facing <编号>] [--override <原名=目标名>]... [--hide-layer <名称>]... [--skip-missing-symbols] [--scale <倍数>] [--output <目录>]
   dst anim gif <animation.zip> --animation <名称> [--build <build.zip>] [--override-build <build.zip>]... [--bank <bank>] [--facing <编号>] [--override <原名=目标名>]... [--hide-layer <名称>]... [--skip-missing-symbols] [--scale <倍数>] [--output <GIF>]
   dst anim lottie <animation.zip> --animation <名称> [--build <build.zip>] [--bank <bank>] [--facing <编号>] [--override <原名=目标名>]... [--skip-missing-symbols] [--padding <像素>] [--external-images] [--keyframe-mode <lossless|linear|visual|0|1|2>] [--keyframe-tolerance <像素>] [--output <JSON>]
-  dst anim web <animation.zip> [--animation <名称>]... [--build <build.zip>] [--override <原名=目标名>]... [--variant <名称:原名=目标名>]... [--demo | --player] [--title <标题>] [--output <目录>]
+  dst anim web <animation.zip> [--animation <名称>]... [--build <build.zip>] [--override-build <build.zip>]... [--bank <bank>] [--facing <编号>] [--override <原名=目标名>]... [--hide-layer <名称>]... [--skip-missing-symbols] [--variant <名称:原名=目标名>]... [--demo | --player] [--title <标题>] [--output <目录>]
 
 示例：
   dst game "/path/to/Don't Starve Together" --match inventoryimages

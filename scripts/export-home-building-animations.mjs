@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { access, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { URL } from "node:url";
@@ -12,6 +12,7 @@ import {
   openBuildBundle,
   renderAnimationFrame,
 } from "../dist/animation/index.js";
+import { compileWebAnimation } from "../dist/web-animation/index.js";
 
 const gameAnimRoot = path.join(
   process.argv[2] ?? path.join(
@@ -39,14 +40,14 @@ const stateVisuals = {};
 const directionalVisuals = {};
 const snowBuild = await openBuildBundle(path.join(gameAnimRoot, "snow.zip"));
 for (const building of buildings) {
-  const result = await renderBuilding(building, building, `${building.id}.webp`, true);
+  const result = await renderBuilding(building, building, `${building.id}.webp`);
   await rm(path.join(outputRoot, `${building.id}.png`), { force: true });
   visuals[building.id] = result.visual;
   if (building.states) {
     stateVisuals[building.id] = {};
     for (const state of building.states) {
       const filename = `${building.id}-${state.id}.webp`;
-      const stateResult = await renderBuilding(building, state, filename, true);
+      const stateResult = await renderBuilding(building, state, filename);
       stateVisuals[building.id][state.id] = {
         label: state.label,
         image: filename,
@@ -69,7 +70,6 @@ for (const wall of walls) {
           facingBit: 1 << facing,
         },
         `${wall.id}-facing-${facing}.webp`,
-        false,
       );
       facings.push({
         image: `${wall.id}-facing-${facing}.webp`,
@@ -83,7 +83,6 @@ for (const wall of walls) {
           facingBit: 1 << facing,
         },
         `${wall.id}-rotated-facing-${facing}.webp`,
-        false,
       );
       rotatedFacings.push({
         image: `${wall.id}-rotated-facing-${facing}.webp`,
@@ -98,7 +97,6 @@ for (const wall of walls) {
             facingBit: 1 << facing,
           },
           `${wall.id}-swing-right-facing-${facing}.webp`,
-          false,
         );
         swingRightFacings.push({
           image: `${wall.id}-swing-right-facing-${facing}.webp`,
@@ -113,7 +111,6 @@ for (const wall of walls) {
             facingBit: 1 << facing,
           },
           `${wall.id}-swing-right-rotated-facing-${facing}.webp`,
-          false,
         );
         swingRightRotatedFacings.push({
           image: `${wall.id}-swing-right-rotated-facing-${facing}.webp`,
@@ -137,13 +134,11 @@ for (const wall of walls) {
     wall,
     { ...wall, facing: cardinalFacing },
     `${wall.id}-cardinal.webp`,
-    false,
   );
   const diagonal = await renderBuilding(
     wall,
     { ...wall, facing: diagonalFacing },
     `${wall.id}.webp`,
-    false,
   );
   visuals[wall.id] = diagonal.visual;
   directionalVisuals[wall.id] = {
@@ -161,13 +156,11 @@ for (const wall of walls) {
       wall,
       { ...wall, archive: wall.wideArchive, facing: cardinalFacing },
       `${wall.id}-rotated-cardinal.webp`,
-      false,
     );
     const rotatedDiagonal = await renderBuilding(
       wall,
       { ...wall, archive: wall.wideArchive, facing: diagonalFacing },
       `${wall.id}-rotated-diagonal.webp`,
-      false,
     );
     directionalVisuals[wall.id].rotatedCardinal = {
       image: `${wall.id}-rotated-cardinal.webp`,
@@ -233,7 +226,7 @@ async function removeStaleStateFiles() {
   }
 }
 
-async function renderBuilding(building, variant, filename, skipExisting = false) {
+async function renderBuilding(building, variant, filename) {
   const archive = variant.archive ?? building.archive;
   const facing = variant.facing ?? building.facing;
   const facingBit = variant.facingBit;
@@ -259,7 +252,7 @@ async function renderBuilding(building, variant, filename, skipExisting = false)
 
   const frameIndexes = variant.frame === "last"
     ? [animation.frames.length - 1]
-    : animation.frames.map((_, frameIndex) => frameIndex);
+    : [0];
   const bounds = variant.frame === "last"
     ? animation.frames.at(-1)?.bounds
     : animationBounds(animation);
@@ -275,16 +268,17 @@ async function renderBuilding(building, variant, filename, skipExisting = false)
     anchorX: mirrorFacing ? 1 - anchorX : anchorX,
     anchorY: (bounds.height / 2 - bounds.y + padding) / viewHeight,
   };
-  if (skipExisting && await fileExists(outputPath)) {
-    process.stdout.write(`${building.id}/${variant.id ?? "default"}: 复用 ${filename}\n`);
-    return { visual };
-  }
   const symbolOverrideBuildArchives = variant.symbolOverrideBuildArchives
     ?? building.symbolOverrideBuildArchives
     ?? [];
   const symbolOverrideBuilds = await Promise.all(symbolOverrideBuildArchives.map(name =>
     openBuildBundle(path.join(gameAnimRoot, `${name}.zip`))));
   if (variant.snow) symbolOverrideBuilds.push(snowBuild);
+  const animationAsset = !variant.snow
+    && symbolOverrideBuildArchives.length === 0
+    && variant.frame !== "last"
+    ? await writeWebAnimation(bundle, building, variant, animation, renderFacing, filename)
+    : null;
   const pages = [];
   let width = 0;
   let pageHeight = 0;
@@ -322,14 +316,48 @@ async function renderBuilding(building, variant, filename, skipExisting = false)
   process.stdout.write(
     `${building.id}/${variant.id ?? "default"}: ${variant.animation}, ${animation.frames.length} frames @ ${animation.frameRate} FPS\n`,
   );
-  return { visual };
+  return {
+    visual: {
+      ...visual,
+      ...(animationAsset ? { animation: animationAsset } : {}),
+    },
+  };
 }
 
-async function fileExists(filename) {
-  try {
-    await access(filename);
-    return true;
-  } catch {
-    return false;
-  }
+async function writeWebAnimation(
+  bundle,
+  building,
+  variant,
+  animation,
+  facing,
+  imageFilename,
+) {
+  const assetName = path.basename(imageFilename, path.extname(imageFilename));
+  const assetDirectory = path.join(outputRoot, assetName);
+  const manifestFilename = "animation.json";
+  const atlasFilename = "atlas.webp";
+  const animationPackage = await compileWebAnimation(bundle, {
+    animations: [animation.name],
+    ...(animation.bankName ? { bank: animation.bankName } : {}),
+    ...(facing === undefined ? {} : { facing }),
+    symbolOverrides: variant.symbolOverrides ?? building.symbolOverrides,
+    hiddenLayers: variant.hiddenLayers,
+    skipMissingSymbols: true,
+    atlasFile: atlasFilename,
+  });
+  await mkdir(assetDirectory, { recursive: true });
+  await Promise.all([
+    writeFile(
+      path.join(assetDirectory, manifestFilename),
+      `${JSON.stringify(animationPackage.manifest)}\n`,
+      "utf8",
+    ),
+    writeFile(path.join(assetDirectory, atlasFilename), animationPackage.atlas),
+  ]);
+  return {
+    manifest: `${assetName}/${manifestFilename}`,
+    atlas: `${assetName}/${atlasFilename}`,
+    name: animation.name,
+    pixelsPerWorldUnit: animationPixelsPerWorldUnit,
+  };
 }

@@ -3,6 +3,7 @@ import sharp from "sharp";
 import type { AnimationBundle } from "../animation/archive.js";
 import {
   compileDstSpriteAnimation,
+  type CompileDstSpriteAnimationOptions,
   type SpriteAnimationPackage,
 } from "../sprite-animation/index.js";
 import type {
@@ -12,11 +13,7 @@ import type {
   WebAnimationSprite,
 } from "./types.js";
 
-export type CompileWebAnimationOptions = {
-  animations?: readonly string[];
-  bank?: string;
-  facing?: number;
-  symbolOverrides?: Readonly<Record<string, string>>;
+export type CompileWebAnimationOptions = CompileDstSpriteAnimationOptions & {
   atlasFile?: string;
 };
 

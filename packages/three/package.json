@@ -1,7 +1,7 @@
 {
-  "name": "@driftee/dstjs-player",
+  "name": "@driftee/dstjs-three",
   "version": "0.1.0",
-  "description": "A lightweight headless Canvas player for DST.js web animations.",
+  "description": "A Three.js renderer for DST.js web animations.",
   "type": "module",
   "license": "MIT",
   "sideEffects": false,
@@ -29,6 +29,13 @@
     "watch:self": "tsc -p tsconfig.build.json --watch --preserveWatchOutput"
   },
   "dependencies": {
-    "@driftee/dstjs-core": "^0.1.1"
+    "@driftee/dstjs-core": "^0.2.0"
+  },
+  "peerDependencies": {
+    "three": ">=0.170.0 <1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.179.0",
+    "three": "^0.179.1"
   }
 }

@@ -240,7 +240,8 @@ so renderers retain source fidelity while future editors share one transform
 model. These platform-neutral types and algorithms live in
 `@driftee/dstjs-core`; this package re-exports them for compatibility.
 Browser playback is provided separately by the UI-free
-`@driftee/dstjs-player` Canvas runtime.
+`@driftee/dstjs-canvas` provides the Canvas 2D runtime, while
+`@driftee/dstjs-three` renders the same manifest in Three.js scenes.
 
 The Lottie exporter deterministically tracks matching elements across frames.
 Its keyframe modes are `lossless`/`0` for per-frame hold keyframes (the

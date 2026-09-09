@@ -65,6 +65,43 @@ describe("Web animation compiler", () => {
     expect(result.manifest.animations.idle?.frames[0]?.elements[0]?.sprite).toBe("5:0");
   });
 
+  it("passes sprite selection and missing-symbol options through to the DST compiler", async () => {
+    const bundle = createBundle();
+    const animation = bundle.animation.animations[0];
+    const frame = animation?.frames[0];
+    if (!animation || !frame) throw new Error("missing synthetic animation frame");
+    const element = frame.elements[0];
+    if (!element) throw new Error("missing synthetic animation element");
+    frame.elements.push({ ...element, symbolHash: 999 });
+
+    const result = await compileWebAnimation(bundle, {
+      animations: ["idle"],
+      ...(animation.bankName === null ? {} : { bank: animation.bankName }),
+      facing: animation.facing,
+      skipMissingSymbols: true,
+    });
+
+    expect(result.manifest.animations.idle?.frames[0]?.elements).toHaveLength(1);
+  });
+
+  it("passes hidden layers through to the DST compiler", async () => {
+    const bundle = createBundle();
+    const element = bundle.animation.animations[0]?.frames[0]?.elements[0];
+    if (!element) throw new Error("missing synthetic animation element");
+    bundle.animation.animations[0]!.frames[0]!.elements.push({
+      ...element,
+      layerHash: 7,
+      layerName: "visible_layer",
+    });
+
+    const result = await compileWebAnimation(bundle, {
+      hiddenLayers: ["square_layer"],
+    });
+
+    expect(result.manifest.animations.idle?.frames[0]?.elements).toHaveLength(1);
+    expect(result.manifest.animations.idle?.frames[0]?.elements[0]?.sprite).toBe("3:0");
+  });
+
   it("compiles the target-neutral sprite animation package into the existing Web format", async () => {
     const animationPackage = await compileDstSpriteAnimation(createBundle());
     const result = await compileWebAnimationPackage(animationPackage);

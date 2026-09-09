@@ -1,6 +1,6 @@
 {
   "name": "@driftee/dstjs",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A TypeScript toolkit for parsing, extracting, converting, and rendering Don't Starve Together assets.",
   "type": "module",
   "license": "MIT",
@@ -69,22 +69,23 @@
     }
   },
   "scripts": {
-    "build": "pnpm build:core && pnpm build:player && pnpm clean:root && tsc -p tsconfig.build.json",
+    "build": "pnpm build:core && pnpm build:canvas && pnpm build:three && pnpm clean:root && tsc -p tsconfig.build.json",
     "build:core": "pnpm --dir packages/core build",
-    "build:player": "pnpm --dir packages/player build",
-    "build:watch": "pnpm build:core && pnpm build:player && pnpm --recursive --parallel --include-workspace-root --filter @driftee/dstjs-core --filter @driftee/dstjs-player --filter @driftee/dstjs run watch:self",
+    "build:canvas": "pnpm --dir packages/canvas build",
+    "build:three": "pnpm --dir packages/three build",
+    "build:watch": "pnpm build:core && pnpm build:canvas && pnpm build:three && pnpm --recursive --parallel --include-workspace-root --filter @driftee/dstjs-core --filter @driftee/dstjs-canvas --filter @driftee/dstjs-three --filter @driftee/dstjs run watch:self",
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
-    "clean": "pnpm clean:root && pnpm --dir packages/core clean && pnpm --dir packages/player clean",
+    "clean": "pnpm clean:root && pnpm --dir packages/core clean && pnpm --dir packages/canvas clean && pnpm --dir packages/three clean",
     "clean:root": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "dev": "pnpm build:core && tsx src/cli.ts",
     "lint": "eslint . --max-warnings 0",
     "prepublishOnly": "pnpm check",
     "test": "pnpm build:core && vitest run",
-    "typecheck": "pnpm build:core && pnpm --dir packages/core typecheck && pnpm --dir packages/player typecheck && tsc --noEmit",
+    "typecheck": "pnpm build:core && pnpm --dir packages/core typecheck && pnpm --dir packages/canvas typecheck && pnpm --dir packages/three typecheck && tsc --noEmit",
     "watch:self": "tsc -p tsconfig.build.json --watch --preserveWatchOutput"
   },
   "dependencies": {
-    "@driftee/dstjs-core": "^0.1.0",
+    "@driftee/dstjs-core": "^0.2.0",
     "decode-dxt": "1.0.1",
     "fast-xml-parser": "5.11.0",
     "gettext-parser": "9.1.1",

@@ -1,18 +1,16 @@
 import type {
-  WebAnimationClip,
   WebAnimationManifest,
+} from "@driftee/dstjs-core/web-animation";
+import {
+  animationFrameAtTime,
+  selectWebAnimation,
+  webAnimationBounds,
 } from "@driftee/dstjs-core/web-animation";
 
 import type {
-  DstAnimationBounds,
   DstCanvas2DContext,
   RenderDstAnimationFrameOptions,
 } from "./types.js";
-
-const boundsCache = new WeakMap<
-  WebAnimationManifest,
-  WeakMap<WebAnimationClip, DstAnimationBounds>
->();
 
 export function renderDstAnimationFrame(
   context: DstCanvas2DContext,
@@ -20,7 +18,7 @@ export function renderDstAnimationFrame(
   atlas: CanvasImageSource,
   options: RenderDstAnimationFrameOptions,
 ): number {
-  const clip = selectAnimation(manifest, options.animation);
+  const clip = selectWebAnimation(manifest, options.animation);
   const frameIndex = animationFrameAtTime(clip, options.time);
   const frame = clip.frames[frameIndex];
   if (!frame) throw new Error(`动画 ${options.animation} 不包含可渲染帧`);
@@ -81,62 +79,7 @@ export function renderDstAnimationFrame(
   return frameIndex;
 }
 
-export function animationFrameAtTime(clip: WebAnimationClip, time: number): number {
-  if (!Number.isFinite(time)) throw new Error(`动画时间无效：${time}`);
-  return Math.min(
-    clip.frames.length - 1,
-    Math.max(0, Math.floor(Math.max(0, time) * clip.frameRate)),
-  );
-}
-
-export function webAnimationBounds(
-  manifest: WebAnimationManifest,
-  animation: string | WebAnimationClip,
-): DstAnimationBounds {
-  const clip = typeof animation === "string" ? selectAnimation(manifest, animation) : animation;
-  const cached = boundsCache.get(manifest)?.get(clip);
-  if (cached) return cached;
-  const bounds: DstAnimationBounds = {
-    left: Number.POSITIVE_INFINITY,
-    top: Number.POSITIVE_INFINITY,
-    right: Number.NEGATIVE_INFINITY,
-    bottom: Number.NEGATIVE_INFINITY,
-  };
-  for (const frame of clip.frames) {
-    for (const element of frame.elements) {
-      const sprite = manifest.sprites[element.sprite];
-      if (!sprite) throw new Error(`动画引用了不存在的 Sprite ${element.sprite}`);
-      const [a, b, c, d, tx, ty] = element.transform;
-      const corners = [
-        [-sprite.originX, -sprite.originY],
-        [sprite.width - sprite.originX, -sprite.originY],
-        [-sprite.originX, sprite.height - sprite.originY],
-        [sprite.width - sprite.originX, sprite.height - sprite.originY],
-      ];
-      for (const [x = 0, y = 0] of corners) {
-        const transformedX = a * x + c * y + tx;
-        const transformedY = b * x + d * y + ty;
-        bounds.left = Math.min(bounds.left, transformedX);
-        bounds.top = Math.min(bounds.top, transformedY);
-        bounds.right = Math.max(bounds.right, transformedX);
-        bounds.bottom = Math.max(bounds.bottom, transformedY);
-      }
-    }
-  }
-  const resolved = Number.isFinite(bounds.left)
-    ? bounds
-    : { left: -1, top: -1, right: 1, bottom: 1 };
-  let manifestBounds = boundsCache.get(manifest);
-  if (!manifestBounds) {
-    manifestBounds = new WeakMap();
-    boundsCache.set(manifest, manifestBounds);
-  }
-  manifestBounds.set(clip, resolved);
-  return resolved;
-}
-
-function selectAnimation(manifest: WebAnimationManifest, name: string): WebAnimationClip {
-  const clip = manifest.animations[name];
-  if (!clip) throw new Error(`找不到动画 ${name}`);
-  return clip;
-}
+export {
+  animationFrameAtTime,
+  webAnimationBounds,
+} from "@driftee/dstjs-core/web-animation";

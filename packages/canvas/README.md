@@ -1,11 +1,11 @@
-# @driftee/dstjs-player
+# @driftee/dstjs-canvas
 
-[简体中文](https://unpkg.com/@driftee/dstjs-player@0.1.0/README.zh-CN.md)
+[简体中文](https://unpkg.com/@driftee/dstjs-canvas@0.1.0/README.zh-CN.md)
 
 A lightweight, UI-free Canvas player for `dstjs-web-animation` manifests.
 
 ```ts
-import { createDstAnimationPlayer } from "@driftee/dstjs-player";
+import { createDstAnimationPlayer } from "@driftee/dstjs-canvas";
 
 const player = createDstAnimationPlayer(context, manifest, atlas, {
   animation: "idle",

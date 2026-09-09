@@ -1,6 +1,6 @@
 # @driftee/dstjs-core
 
-[English](./README.md)
+[English](https://unpkg.com/@driftee/dstjs-core@0.2.0/README.md)
 
 供 `@driftee/dstjs`、浏览器播放器和后续编辑器共用的平台无关数据格式与算法。
 

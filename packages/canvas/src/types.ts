@@ -1,15 +1,11 @@
 import type {
+  WebAnimationBounds,
   WebAnimationManifest,
 } from "@driftee/dstjs-core/web-animation";
 
 export type DstAnimationFit = "contain" | "cover" | "none";
 
-export type DstAnimationBounds = {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-};
+export type DstAnimationBounds = WebAnimationBounds;
 
 export type DstAnimationFrameState = {
   animation: string;
