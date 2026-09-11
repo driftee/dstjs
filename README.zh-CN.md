@@ -111,6 +111,18 @@ pnpm dev anim web ./cherrytree_petal_fx.zip \
   --output ./output/cherry-petal-web
 ```
 
+对于 swap 等“大画布、小内容”动画，可在导出静态帧或 Web 动画时启用内容裁剪：
+
+```bash
+pnpm dev anim web ./swap.zip \
+  --animation anim \
+  --crop-content \
+  --alpha-threshold 8 \
+  --output ./output/swap-web
+```
+
+Web 导出会逐个裁剪 sprite 并同步补偿原点，因此不会改变动画中的实际位置。
+
 导出料理目录：
 
 ```bash

@@ -6,6 +6,7 @@ import {
   applyAnimationColourToPng,
   type AnimationColour,
 } from "./colour.js";
+import { pruneTransparentImage } from "../image/prune.js";
 import type { Animation, AnimationElement, BuildFrame, BuildSymbol, Rectangle } from "./types.js";
 
 const MAX_RENDER_DIMENSION = 8_192;
@@ -27,6 +28,9 @@ export type RenderAnimationFrameOptions = {
   hiddenLayers?: readonly string[];
   multColour?: AnimationColour;
   addColour?: AnimationColour;
+  cropContent?: boolean;
+  cropAlphaThreshold?: number;
+  cropPadding?: number;
 };
 
 export type RenderedAnimationFrame = {
@@ -37,7 +41,10 @@ export type RenderedAnimationFrame = {
   frameIndex: number;
 };
 
-export type RenderAnimationGifOptions = Omit<RenderAnimationFrameOptions, "frameIndex" | "bounds">;
+export type RenderAnimationGifOptions = Omit<
+  RenderAnimationFrameOptions,
+  "frameIndex" | "bounds" | "cropContent" | "cropAlphaThreshold" | "cropPadding"
+>;
 
 export type RenderedAnimationGif = {
   gif: Buffer;
@@ -166,7 +173,21 @@ export async function renderAnimationFrame(
     "</svg>",
   ].join("");
   const png = await sharp(Buffer.from(svg)).png().toBuffer();
-  return { png, width: outputWidth, height: outputHeight, animation, frameIndex: options.frameIndex };
+  if (!options.cropContent) {
+    return { png, width: outputWidth, height: outputHeight, animation, frameIndex: options.frameIndex };
+  }
+  const cropped = await pruneTransparentImage(png, {
+    alphaThreshold: options.cropAlphaThreshold,
+    padding: options.cropPadding,
+    format: "png",
+  });
+  return {
+    png: cropped.image,
+    width: cropped.width,
+    height: cropped.height,
+    animation,
+    frameIndex: options.frameIndex,
+  };
 }
 
 export async function renderAnimationGif(

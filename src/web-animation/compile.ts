@@ -1,6 +1,7 @@
 import sharp from "sharp";
 
 import type { AnimationBundle } from "../animation/archive.js";
+import { pruneTransparentImage } from "../image/prune.js";
 import {
   compileDstSpriteAnimation,
   type CompileDstSpriteAnimationOptions,
@@ -15,6 +16,9 @@ import type {
 
 export type CompileWebAnimationOptions = CompileDstSpriteAnimationOptions & {
   atlasFile?: string;
+  cropContent?: boolean;
+  cropAlphaThreshold?: number;
+  cropPadding?: number;
 };
 
 type SpriteSource = {
@@ -37,7 +41,10 @@ export async function compileWebAnimation(
 
 export async function compileWebAnimationPackage(
   animationPackage: SpriteAnimationPackage,
-  options: Pick<CompileWebAnimationOptions, "atlasFile"> = {},
+  options: Pick<
+    CompileWebAnimationOptions,
+    "atlasFile" | "cropContent" | "cropAlphaThreshold" | "cropPadding"
+  > = {},
 ): Promise<WebAnimationPackage> {
   const clips: Record<string, WebAnimationClip> = {};
   for (const clip of animationPackage.document.clips) {
@@ -60,14 +67,17 @@ export async function compileWebAnimationPackage(
     .sort(([left], [right]) => left.localeCompare(right))) {
     const png = animationPackage.images.get(key);
     if (!png) throw new Error(`Sprite ${key} 缺少图片数据`);
-    spriteSources.push({
+    const source: SpriteSource = {
       key,
       png: Buffer.from(png),
       width: asset.width,
       height: asset.height,
       originX: asset.originX,
       originY: asset.originY,
-    });
+    };
+    spriteSources.push(options.cropContent
+      ? await cropSpriteSource(source, options.cropAlphaThreshold, options.cropPadding)
+      : source);
   }
   const { placements, width, height } = packSprites(spriteSources);
   const atlas = await sharp({
@@ -91,6 +101,27 @@ export async function compileWebAnimationPackage(
     animations: clips,
   };
   return { manifest, atlas };
+}
+
+async function cropSpriteSource(
+  source: SpriteSource,
+  alphaThreshold = 0,
+  padding = 0,
+): Promise<SpriteSource> {
+  const cropped = await pruneTransparentImage(source.png, {
+    alphaThreshold,
+    padding,
+    format: "png",
+  });
+  if (!cropped.boundingBox) return source;
+  return {
+    ...source,
+    png: cropped.image,
+    width: cropped.width,
+    height: cropped.height,
+    originX: source.originX - cropped.boundingBox.left + cropped.padding.left,
+    originY: source.originY - cropped.boundingBox.top + cropped.padding.top,
+  };
 }
 
 function packSprites(sources: SpriteSource[], padding = 2): {

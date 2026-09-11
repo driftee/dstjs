@@ -43,6 +43,7 @@ const ANIM_HELP = `用法：
   --override <原名=目标名>   替换 symbol，可重复
   --hide-layer <名称>        隐藏图层，可重复
   --skip-missing-symbols     忽略 build 中缺失的 symbol
+  --crop-content             按非透明内容裁剪 frame 或 Web sprite
   --mult-colour <r,g,b,a>    模拟 AnimState:SetMultColour
   --add-colour <r,g,b,a>     模拟 AnimState:SetAddColour
   --scale <倍数>             设置 frame、frames、gif 的输出倍率
@@ -79,6 +80,9 @@ const ANIM_ACTION_HELP: Record<string, string> = {
   --override <原名=目标名>   替换 symbol，可重复
   --hide-layer <名称>        隐藏图层，可重复
   --skip-missing-symbols     忽略缺失 symbol
+  --crop-content             按非透明内容裁剪最终 PNG
+  --alpha-threshold <0-255>  裁剪透明阈值，默认 0
+  --padding <像素>           裁剪后保留的透明边距，默认 0
   --mult-colour <r,g,b,a>    模拟 AnimState:SetMultColour
   --add-colour <r,g,b,a>     模拟 AnimState:SetAddColour
   --output <PNG>             输出路径
@@ -125,6 +129,9 @@ GIF 不支持半透明 alpha；--mult-colour 的第 4 项必须为 1。
   --player                   同时生成动画播放器
   --title <标题>             设置播放器标题
   --variant <名称:原名=目标名>
+  --crop-content             裁剪各 sprite 并补偿原点
+  --alpha-threshold <0-255>  裁剪透明阈值，默认 0
+  --padding <像素>           sprite 裁剪后保留的透明边距，默认 0
 
 同时支持动画通用的 build、bank、facing、override、隐藏图层、颜色和输出参数。
 

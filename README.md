@@ -228,6 +228,17 @@ pnpm dev anim web ./cherrytree_petal_fx.zip \
   --output ./output/cherry-petal-web
 ```
 
+For swap-style animations with a large transparent canvas, crop exported
+sprites while preserving their animation-space origins:
+
+```bash
+pnpm dev anim web ./swap.zip \
+  --animation anim \
+  --crop-content \
+  --alpha-threshold 8 \
+  --output ./output/swap-web
+```
+
 The `anim web` command writes `animation.json` and `atlas.webp`. With `--demo`,
 it also writes a self-contained `index.html` that demonstrates scene
 orchestration independently of any Wiki implementation.

@@ -76,6 +76,7 @@ type Arguments = {
   keyframeMode: LottieKeyframeMode;
   keyframeTolerance: number;
   skipMissingSymbols: boolean;
+  cropContent: boolean;
   hiddenLayers: string[];
   multColour: AnimationColour | null;
   addColour: AnimationColour | null;
@@ -349,6 +350,9 @@ async function main(): Promise<void> {
         hiddenLayers: arguments_.hiddenLayers,
         multColour: arguments_.multColour ?? undefined,
         addColour: arguments_.addColour ?? undefined,
+        cropContent: arguments_.cropContent,
+        cropAlphaThreshold: arguments_.alphaThreshold,
+        cropPadding: arguments_.padding ?? undefined,
       });
       const variantDefinitions = parseVariants(arguments_.variants);
       const variantPackages = arguments_.demo
@@ -364,6 +368,9 @@ async function main(): Promise<void> {
             hiddenLayers: arguments_.hiddenLayers,
             multColour: arguments_.multColour ?? undefined,
             addColour: arguments_.addColour ?? undefined,
+            cropContent: arguments_.cropContent,
+            cropAlphaThreshold: arguments_.alphaThreshold,
+            cropPadding: arguments_.padding ?? undefined,
           }),
         ] as const)))
         : {};
@@ -440,6 +447,9 @@ async function main(): Promise<void> {
         hiddenLayers: arguments_.hiddenLayers,
         multColour: arguments_.multColour ?? undefined,
         addColour: arguments_.addColour ?? undefined,
+        cropContent: arguments_.cropContent,
+        cropAlphaThreshold: arguments_.alphaThreshold,
+        cropPadding: arguments_.padding ?? undefined,
       });
       const outputPath = path.resolve(arguments_.output.endsWith(".png")
         ? arguments_.output
@@ -579,6 +589,7 @@ function parseArguments(values: string[]): Arguments {
   let keyframeMode: LottieKeyframeMode = "lossless";
   let keyframeTolerance = 0.25;
   let skipMissingSymbols = false;
+  let cropContent = false;
   const hiddenLayers: string[] = [];
   let multColour: AnimationColour | null = null;
   let addColour: AnimationColour | null = null;
@@ -599,6 +610,10 @@ function parseArguments(values: string[]): Arguments {
     }
     if (value === "--skip-missing-symbols") {
       skipMissingSymbols = true;
+      continue;
+    }
+    if (value === "--crop-content") {
+      cropContent = true;
       continue;
     }
     if (
@@ -694,6 +709,7 @@ function parseArguments(values: string[]): Arguments {
     keyframeMode,
     keyframeTolerance,
     skipMissingSymbols,
+    cropContent,
     hiddenLayers,
     multColour,
     addColour,

@@ -82,6 +82,34 @@ describe("DST animation binaries", () => {
     expect([...data].filter((_, index) => index % 4 === 3).some((alpha) => alpha > 0)).toBe(true);
   });
 
+  it("crops a rendered frame to its non-transparent content", async () => {
+    const animation = parseAnimation(createAnimationBinary());
+    const frame = animation.animations[0]?.frames[0];
+    if (!frame) throw new Error("missing synthetic animation frame");
+    frame.bounds = { x: 0, y: 0, width: 10, height: 12 };
+    const bundle: AnimationBundle = {
+      animation,
+      build: parseBuild(createBuildBinary()),
+      atlases: new Map([["atlas-0.tex", {
+        width: 2,
+        height: 2,
+        rgba: new Uint8Array(16).fill(255),
+        compression: "rgba",
+        mipmapCount: 1,
+      }]]),
+    };
+
+    const result = await renderAnimationFrame(bundle, {
+      animation: "idle",
+      frameIndex: 0,
+      padding: 0,
+      cropContent: true,
+    });
+
+    expect(result).toMatchObject({ width: 2, height: 2 });
+    await expect(sharp(result.png).metadata()).resolves.toMatchObject({ width: 2, height: 2 });
+  });
+
   it("applies AnimState multiply and additive colours to rendered frames", async () => {
     const bundle: AnimationBundle = {
       animation: parseAnimation(createAnimationBinary()),

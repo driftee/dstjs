@@ -31,7 +31,14 @@ describe("formatCliHelp", () => {
     const help = formatCliHelp(["anim", "frame"]);
     expect(help).toContain("dst anim frame <animation.zip>");
     expect(help).toContain("--skip-missing-symbols");
+    expect(help).toContain("--crop-content");
     expect(help).toContain("--mult-colour <r,g,b,a>");
     expect(help).toContain("--add-colour <r,g,b,a>");
+  });
+
+  it("documents content cropping for Web animation exports", () => {
+    const help = formatCliHelp(["anim", "web"]);
+    expect(help).toContain("--crop-content");
+    expect(help).toContain("--alpha-threshold <0-255>");
   });
 });

@@ -114,6 +114,41 @@ describe("Web animation compiler", () => {
     expect(Object.keys(result.manifest.sprites)).toEqual(["3:0"]);
   });
 
+  it("crops Web sprites and adjusts their origins without changing content coordinates", async () => {
+    const animationPackage = await compileDstSpriteAnimation(createBundle());
+    const asset = animationPackage.document.assets["3:0"];
+    if (!asset) throw new Error("missing synthetic sprite asset");
+    asset.width = 10;
+    asset.height = 8;
+    asset.originX = 6;
+    asset.originY = 4;
+    const rgba = new Uint8Array(10 * 8 * 4);
+    for (let y = 2; y < 5; y += 1) {
+      for (let x = 7; x < 9; x += 1) {
+        const offset = (y * 10 + x) * 4;
+        rgba[offset] = 255;
+        rgba[offset + 3] = 255;
+      }
+    }
+    const croppedSource = await sharp(rgba, {
+      raw: { width: 10, height: 8, channels: 4 },
+    }).png().toBuffer();
+
+    const result = await compileWebAnimationPackage({
+      ...animationPackage,
+      images: new Map(animationPackage.images).set("3:0", croppedSource),
+    }, {
+      cropContent: true,
+    });
+
+    expect(result.manifest.sprites["3:0"]).toMatchObject({
+      width: 2,
+      height: 3,
+      originX: -1,
+      originY: 2,
+    });
+  });
+
   it("creates a standalone two-layer scene with interactive controls", async () => {
     const result = await compileWebAnimation(createBundle());
     const html = createPetalSceneHtml(result, {
