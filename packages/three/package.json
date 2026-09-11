@@ -15,6 +15,10 @@
     "README.zh-CN.md"
   ],
   "exports": {
+    "./preview": {
+      "types": "./dist/preview.d.ts",
+      "default": "./dist/preview.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"

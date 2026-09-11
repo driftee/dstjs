@@ -18,3 +18,6 @@ animation.update(deltaSeconds);
 ## 许可证
 
 MIT
+# 游戏预览入口
+
+`@driftee/dstjs-three/preview` 提供 `DstPreviewScene`、`billboardMetrics`、`nativeCameraOffset`。默认沿用建家模拟器的 160 像素/世界单位；资源使用其他比例时，通过 `setSurface` 的 `pixelsPerWorldUnit` 传入。所有平面保留原点，共用镜头。调用方提供 Canvas 帧和 bounds，负责时钟、人物资源与业务 UI；关闭时调用 `dispose()`。完整 LUT 由 `setCube()` 注入，不随包分发游戏资源。局部光照、Bloom 和人物内部层级穿插不在当前实现范围内。

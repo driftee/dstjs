@@ -1,4 +1,8 @@
 import type { AnimationBundle, BuildBundle } from "../animation/archive.js";
+import {
+  applyAnimationColourToPng,
+  type AnimationColour,
+} from "../animation/colour.js";
 import { selectBuildFrame, sortAnimationElementsForDraw } from "../animation/render.js";
 import type { Animation, BuildFrame, BuildSymbol } from "../animation/types.js";
 import { rasterizeBuildFrame } from "./rasterize.js";
@@ -17,6 +21,8 @@ export type CompileDstSpriteAnimationOptions = {
   symbolOverrideBuilds?: readonly BuildBundle[];
   skipMissingSymbols?: boolean;
   hiddenLayers?: readonly string[];
+  multColour?: AnimationColour;
+  addColour?: AnimationColour;
 };
 
 export async function compileDstSpriteAnimation(
@@ -130,7 +136,10 @@ export async function compileDstSpriteAnimation(
         dstBuildFrameDuration: frame.duration,
       },
     };
-    images.set(id, sprite.png);
+    images.set(id, await applyAnimationColourToPng(sprite.png, {
+      multiply: options.multColour,
+      add: options.addColour,
+    }));
   }
 
   return {

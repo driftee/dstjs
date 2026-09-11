@@ -101,6 +101,20 @@ describe("DST sprite animation compiler", () => {
     expect(result.document.clips[0]?.frames[0]?.elements[0]?.spriteId).toBe("5:0");
   });
 
+  it("applies AnimState colours to exported sprite assets", async () => {
+    const result = await compileDstSpriteAnimation(createBundle(), {
+      multColour: [0.5, 1, 1, 1],
+      addColour: [0, 0.25, 0, 0],
+    });
+    const image = result.images.get("3:0");
+    if (!image) throw new Error("missing compiled sprite");
+    const { data } = await sharp(image).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const alphaOffset = [...data].findIndex((value, index) => index % 4 === 3 && value > 0);
+    const pixelOffset = alphaOffset - 3;
+
+    expect([...data.subarray(pixelOffset, pixelOffset + 4)]).toEqual([128, 64, 0, 255]);
+  });
+
   it("resolves missing animation symbols from an external override build", async () => {
     const bundle = createBundle();
     const element = bundle.animation.animations[0]?.frames[0]?.elements[0];

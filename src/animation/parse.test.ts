@@ -82,6 +82,64 @@ describe("DST animation binaries", () => {
     expect([...data].filter((_, index) => index % 4 === 3).some((alpha) => alpha > 0)).toBe(true);
   });
 
+  it("applies AnimState multiply and additive colours to rendered frames", async () => {
+    const bundle: AnimationBundle = {
+      animation: parseAnimation(createAnimationBinary()),
+      build: parseBuild(createBuildBinary()),
+      atlases: new Map([["atlas-0.tex", {
+        width: 2,
+        height: 2,
+        rgba: new Uint8Array(16).fill(255),
+        compression: "rgba",
+        mipmapCount: 1,
+      }]]),
+    };
+
+    const result = await renderAnimationFrame(bundle, {
+      animation: "idle",
+      frameIndex: 0,
+      padding: 0,
+      multColour: [0.5, 0.25, 0, 0.5],
+      addColour: [0.1, 0.2, 0.3, 0],
+    });
+    const { data } = await sharp(result.png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const visible = [...data].findIndex((value, index) => index % 4 === 3 && value > 0);
+    const offset = visible - 3;
+
+    expect([...data.subarray(offset, offset + 4)]).toEqual([255, 229, 151, 128]);
+  });
+
+  it("applies alpha colour transforms before overlapping elements are composited", async () => {
+    const animation = parseAnimation(createAnimationBinary());
+    const frame = animation.animations[0]?.frames[0];
+    const element = frame?.elements[0];
+    if (!frame || !element) throw new Error("missing synthetic animation element");
+    frame.elements.push({ ...element, z: element.z + 1 });
+    const bundle: AnimationBundle = {
+      animation,
+      build: parseBuild(createBuildBinary()),
+      atlases: new Map([["atlas-0.tex", {
+        width: 2,
+        height: 2,
+        rgba: new Uint8Array(16).fill(255),
+        compression: "rgba",
+        mipmapCount: 1,
+      }]]),
+    };
+
+    const result = await renderAnimationFrame(bundle, {
+      animation: "idle",
+      frameIndex: 0,
+      padding: 0,
+      multColour: [1, 1, 1, 0.5],
+    });
+    const { data } = await sharp(result.png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const alpha = [...data].find((value, index) => index % 4 === 3 && value > 0);
+
+    expect(alpha).toBeGreaterThan(180);
+    expect(alpha).toBeLessThan(200);
+  });
+
   it("can skip animation elements whose build frame is absent", async () => {
     const animation = parseAnimation(createAnimationBinary());
     const build = parseBuild(createBuildBinary());

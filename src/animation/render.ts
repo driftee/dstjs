@@ -2,6 +2,10 @@ import sharp from "sharp";
 
 import { rasterizeBuildFrame, type RasterizedBuildFrame } from "../sprite-animation/rasterize.js";
 import type { AnimationBundle, BuildBundle } from "./archive.js";
+import {
+  applyAnimationColourToPng,
+  type AnimationColour,
+} from "./colour.js";
 import type { Animation, AnimationElement, BuildFrame, BuildSymbol, Rectangle } from "./types.js";
 
 const MAX_RENDER_DIMENSION = 8_192;
@@ -21,6 +25,8 @@ export type RenderAnimationFrameOptions = {
   bounds?: Rectangle;
   skipMissingSymbols?: boolean;
   hiddenLayers?: readonly string[];
+  multColour?: AnimationColour;
+  addColour?: AnimationColour;
 };
 
 export type RenderedAnimationFrame = {
@@ -123,7 +129,10 @@ export async function renderAnimationFrame(
     const cacheKey = `${overrideSource ? overrideName : symbol.hash}:${buildFrame.frameNumber}`;
     let image = imageCache.get(cacheKey);
     if (!image) {
-      image = renderBuildFrameImage(buildFrame, sourceAtlases);
+      image = renderBuildFrameImage(buildFrame, sourceAtlases, {
+        multiply: options.multColour,
+        add: options.addColour,
+      });
       imageCache.set(cacheKey, image);
     }
     renderedElements.push({ cacheKey, element, sprite: await image });
@@ -264,11 +273,14 @@ export function selectBuildFrame(
 async function renderBuildFrameImage(
   frame: BuildFrame,
   atlases: Parameters<typeof rasterizeBuildFrame>[1],
+  colour: Parameters<typeof applyAnimationColourToPng>[1],
 ): Promise<RasterizedSprite> {
   const rasterized = await rasterizeBuildFrame(frame, atlases, 0);
   return {
     ...rasterized,
-    source: `data:image/png;base64,${rasterized.png.toString("base64")}`,
+    source: `data:image/png;base64,${(
+      await applyAnimationColourToPng(rasterized.png, colour)
+    ).toString("base64")}`,
   };
 }
 

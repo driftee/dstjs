@@ -9,8 +9,10 @@ import {
   openAnimationBundle,
   openBuildBundle,
   openAnimationFile,
+  parseAnimationColour,
   renderAnimationFrame,
   renderAnimationGif,
+  type AnimationColour,
 } from "./animation/index.js";
 import { extractAtlas, extractAtlasFiles, type AtlasManifest } from "./atlas/extract.js";
 import { writeCookingCatalog } from "./cooking/index.js";
@@ -44,6 +46,7 @@ import {
   createAnimationPlayerHtml,
   createPetalSceneHtml,
 } from "./web-animation/index.js";
+import { formatCliHelp, resolveHelpTopic } from "./cli-help.js";
 
 type Arguments = {
   command: string;
@@ -74,11 +77,19 @@ type Arguments = {
   keyframeTolerance: number;
   skipMissingSymbols: boolean;
   hiddenLayers: string[];
+  multColour: AnimationColour | null;
+  addColour: AnimationColour | null;
   title: string | null;
 };
 
 async function main(): Promise<void> {
-  const arguments_ = parseArguments(process.argv.slice(2));
+  const rawArguments = process.argv.slice(2);
+  const helpTopic = resolveHelpTopic(rawArguments);
+  if (helpTopic) {
+    console.log(formatCliHelp(helpTopic));
+    return;
+  }
+  const arguments_ = parseArguments(rawArguments);
   if (arguments_.command === "atlas") {
     const xmlPath = arguments_.positional[0];
     if (!xmlPath) return printUsage(1);
@@ -336,6 +347,8 @@ async function main(): Promise<void> {
         symbolOverrideBuilds,
         skipMissingSymbols: arguments_.skipMissingSymbols,
         hiddenLayers: arguments_.hiddenLayers,
+        multColour: arguments_.multColour ?? undefined,
+        addColour: arguments_.addColour ?? undefined,
       });
       const variantDefinitions = parseVariants(arguments_.variants);
       const variantPackages = arguments_.demo
@@ -349,6 +362,8 @@ async function main(): Promise<void> {
             symbolOverrideBuilds,
             skipMissingSymbols: arguments_.skipMissingSymbols,
             hiddenLayers: arguments_.hiddenLayers,
+            multColour: arguments_.multColour ?? undefined,
+            addColour: arguments_.addColour ?? undefined,
           }),
         ] as const)))
         : {};
@@ -385,6 +400,8 @@ async function main(): Promise<void> {
         symbolOverrides: parseOverrides(arguments_.overrides),
         symbolOverrideBuilds,
         skipMissingSymbols: arguments_.skipMissingSymbols,
+        multColour: arguments_.multColour ?? undefined,
+        addColour: arguments_.addColour ?? undefined,
       });
       const lottiePackage = compileLottiePackage(spriteAnimation, {
         clip: animationName,
@@ -421,6 +438,8 @@ async function main(): Promise<void> {
         scale: arguments_.scale,
         skipMissingSymbols: arguments_.skipMissingSymbols,
         hiddenLayers: arguments_.hiddenLayers,
+        multColour: arguments_.multColour ?? undefined,
+        addColour: arguments_.addColour ?? undefined,
       });
       const outputPath = path.resolve(arguments_.output.endsWith(".png")
         ? arguments_.output
@@ -451,6 +470,8 @@ async function main(): Promise<void> {
           bounds,
           skipMissingSymbols: arguments_.skipMissingSymbols,
           hiddenLayers: arguments_.hiddenLayers,
+          multColour: arguments_.multColour ?? undefined,
+          addColour: arguments_.addColour ?? undefined,
         });
         await writeFile(path.join(outputDirectory, `${frameIndex.toString().padStart(6, "0")}.png`), rendered.png);
       }
@@ -458,6 +479,9 @@ async function main(): Promise<void> {
       return;
     }
     if (action === "gif") {
+      if (arguments_.multColour && arguments_.multColour[3] !== 1) {
+        throw new Error("GIF 不支持半透明 alpha 染色；请使用 anim web、lottie 或 frames");
+      }
       const rendered = await renderAnimationGif(bundle, {
         animation: animationName,
         bank: arguments_.bank ?? undefined,
@@ -467,6 +491,8 @@ async function main(): Promise<void> {
         scale: arguments_.scale,
         skipMissingSymbols: arguments_.skipMissingSymbols,
         hiddenLayers: arguments_.hiddenLayers,
+        multColour: arguments_.multColour ?? undefined,
+        addColour: arguments_.addColour ?? undefined,
       });
       const outputPath = path.resolve(arguments_.output.endsWith(".gif")
         ? arguments_.output
@@ -554,6 +580,8 @@ function parseArguments(values: string[]): Arguments {
   let keyframeTolerance = 0.25;
   let skipMissingSymbols = false;
   const hiddenLayers: string[] = [];
+  let multColour: AnimationColour | null = null;
+  let addColour: AnimationColour | null = null;
   let title: string | null = null;
   for (let index = 0; index < rest.length; index += 1) {
     const value = rest[index];
@@ -595,6 +623,8 @@ function parseArguments(values: string[]): Arguments {
       || value === "--keyframe-mode"
       || value === "--keyframe-tolerance"
       || value === "--hide-layer"
+      || value === "--mult-colour"
+      || value === "--add-colour"
       || value === "--override"
       || value === "--variant"
       || value === "--title"
@@ -624,6 +654,8 @@ function parseArguments(values: string[]): Arguments {
         if (keyframeTolerance <= 0) throw new Error(`${value} 必须大于 0`);
       }
       else if (value === "--hide-layer") hiddenLayers.push(optionValue);
+      else if (value === "--mult-colour") multColour = parseAnimationColour(optionValue, value);
+      else if (value === "--add-colour") addColour = parseAnimationColour(optionValue, value);
       else if (value === "--override") overrides.push(optionValue);
       else if (value === "--title") title = optionValue;
       else variants.push(optionValue);
@@ -663,6 +695,8 @@ function parseArguments(values: string[]): Arguments {
     keyframeTolerance,
     skipMissingSymbols,
     hiddenLayers,
+    multColour,
+    addColour,
     title,
   };
 }
@@ -724,55 +758,7 @@ function isImageOutputFile(output: string): boolean {
 }
 
 function printUsage(exitCode: number): void {
-  console.log(`用法：
-  dst atlas <atlas.xml> [--tex <texture.tex>] [--output <目录>]
-  dst game <游戏目录或data目录> [--match <名称>]... [--output <目录>]
-  dst image prune <image.png|image.gif> [--padding <像素>] [--padding-top <像素>] [--padding-right <像素>] [--padding-bottom <像素>] [--padding-left <像素>] [--alpha-threshold <0-255>] [--output <PNG/GIF 或目录>]
-  dst texture decode <texture.tex> [--output <PNG 或目录>]
-  dst cooking catalog <游戏目录或 data 目录> [--output <目录>]
-  dst turf calibration-assets [--output <校准 Mod 目录>]
-  dst turf ocean-assets <游戏 data 目录> [--output <目录>]
-  dst turf parse-log <server_log.txt> [--output <JSON 或目录>]
-  dst turf capture [client_log.txt] [--output <截图目录>]
-  dst turf coast-capture [client_log.txt] [--output <截图目录>]
-  dst turf recognize <截图目录> [--output <JSON 或目录>]
-  dst turf recognize-native <新版截图目录> [--output <JSON 或目录>]
-  dst turf derive-mapping <识别 JSON> [--output <JSON 或目录>]
-  dst turf simulator <游戏 data 目录> <映射 JSON> [--output <目录>]
-  dst turf catalog <游戏 data 目录> <原生映射 JSON> [--output <目录>]
-  dst turf mod-catalog <模组目录> <原版 catalog.json> <资源包 ID> <Workshop ID> [--output <目录>]
-  dst anim inspect <animation.zip> 或 dst anim inspect --anim <anim.zip>
-  dst anim frame <animation.zip> --animation <名称> [--build <build.zip>] [--override-build <build.zip>]... [--bank <bank>] [--facing <编号>] [--override <原名=目标名>]... [--hide-layer <名称>]... [--skip-missing-symbols] [--frame <序号>] [--scale <倍数>] [--output <PNG>]
-  dst anim frames <animation.zip> --animation <名称> [--build <build.zip>] [--override-build <build.zip>]... [--bank <bank>] [--facing <编号>] [--override <原名=目标名>]... [--hide-layer <名称>]... [--skip-missing-symbols] [--scale <倍数>] [--output <目录>]
-  dst anim gif <animation.zip> --animation <名称> [--build <build.zip>] [--override-build <build.zip>]... [--bank <bank>] [--facing <编号>] [--override <原名=目标名>]... [--hide-layer <名称>]... [--skip-missing-symbols] [--scale <倍数>] [--output <GIF>]
-  dst anim lottie <animation.zip> --animation <名称> [--build <build.zip>] [--bank <bank>] [--facing <编号>] [--override <原名=目标名>]... [--skip-missing-symbols] [--padding <像素>] [--external-images] [--keyframe-mode <lossless|linear|visual|0|1|2>] [--keyframe-tolerance <像素>] [--output <JSON>]
-  dst anim web <animation.zip> [--animation <名称>]... [--build <build.zip>] [--override-build <build.zip>]... [--bank <bank>] [--facing <编号>] [--override <原名=目标名>]... [--hide-layer <名称>]... [--skip-missing-symbols] [--variant <名称:原名=目标名>]... [--demo | --player] [--title <标题>] [--output <目录>]
-
-示例：
-  dst game "/path/to/Don't Starve Together" --match inventoryimages
-  dst atlas ./inventoryimages.xml --tex ./inventoryimages.tex
-  dst image prune ./output/frame.png --padding 4 --padding-bottom 10 --output ./output/frame-pruned.png
-  dst texture decode ./noise_cherrygreen.tex --output ./noise-cherrygreen.png
-  dst cooking catalog "/path/to/game/Contents/data" --output ./output/cooking-catalog
-  dst turf calibration-assets --output ./examples/dstjs-turf-calibrator
-  dst turf ocean-assets "/path/to/game/Contents/data" --output ./output/turf-catalog
-  dst turf parse-log ./server_log.txt --output ./calibration-run.json
-  dst turf mod-catalog ./workshop/1289779251 ./output/turf-catalog/catalog.json cherry-forest 1289779251 --output ./output/turf-catalog
-  dst turf capture --output ./output/turf-captures
-  dst turf coast-capture --output ./output/coast-captures
-  dst turf recognize ./output/turf-captures --output ./output/turf-recognition.json
-  dst turf recognize-native ./output/turf-captures-v2 --output ./output/turf-native-lookup.json
-  dst turf derive-mapping ./output/turf-recognition.json --output ./output/turf-edge-mapping.json
-  dst turf simulator "/path/to/game/Contents/data" ./output/turf-edge-mapping.json --output ./output/turf-simulator
-  dst anim inspect ./wet_meter.zip
-  dst anim frame ./wet_meter.zip --animation idle --frame 0 --output ./wet-meter.png
-  dst anim inspect --anim ./ds_pig_basic.zip
-  dst anim gif --anim ./ds_pig_basic.zip --build ./pig_build.zip --animation idle_loop --facing 8 --hide-layer ARM_carry --hide-layer ARM_carry_up --skip-missing-symbols --output ./pig-idle.gif
-  dst anim lottie ./shadow_skittish.zip --animation idle_loop --output ./shadow-skittish.lottie.json
-  dst anim lottie ./shadow_skittish.zip --animation idle_loop --external-images --output ./shadow-skittish/animation.json
-  dst anim lottie ./shadow_skittish.zip --animation idle_loop --keyframe-mode visual --keyframe-tolerance 0.25 --output ./shadow-skittish-visual.lottie.json
-  dst anim web ./shadow_skittish.zip --animation idle_loop --animation disappear --player --title "Mr. Skitts" --output ./mr-skitts
-  dst anim web ./cherrytree_petal_fx.zip --override autumn=spring --variant spring:autumn=spring --variant autumn:autumn=autumn --demo --output ./cherry-web`);
+  console.log(formatCliHelp([]));
   process.exitCode = exitCode;
 }
 
