@@ -19,7 +19,7 @@ DST.js 以独立 Node.js 包和命令行工具的形式发布。
 - 解析 Atlas XML，并将其中的元素提取为 PNG。
 - 裁剪 PNG/GIF 的透明边缘，并支持分别配置四边留白。
 - 读取松散图片、大头像以及 `images.zip`、`bigportraits.zip` 中的游戏资源。
-- 加载简体中文资源名称和料理描述。
+- 从游戏 PO 加载简体中文正式名称和料理描述，并静态提取模组名称候选。
 - 解析 ANIM v3/v4 与 BILD v5/v6 文件。
 - 检查单体或拆分的动画 ZIP，并输出 PNG 帧或 GIF。
 - 支持 facing、symbol override、隐藏图层和独立 build 包。
@@ -79,6 +79,24 @@ pnpm dev game "/path/to/Don't Starve Together" \
   --output ./output
 ```
 
+解析原版正式中文名：
+
+```bash
+pnpm dev names resolve "/path/to/Don't Starve Together" \
+  lunarplant_husk twigs
+```
+
+静态提取模组名称候选：
+
+```bash
+pnpm dev names resolve-mod ./workshop/1234567890 \
+  mod_item mod_creature
+```
+
+原版名称只有命中 `chinese_s.po` 时才返回 `EXACT`。模组结果根据静态 Lua 字面量返回
+`STATIC`、`AMBIGUOUS` 或 `UNMATCHED`；`STATIC` 仍需结合语言分支复核。命令不会根据
+prefab 自行翻译。
+
 检查并渲染动画：
 
 ```bash
@@ -122,6 +140,27 @@ pnpm dev anim web ./swap.zip \
 ```
 
 Web 导出会逐个裁剪 sprite 并同步补偿原点，因此不会改变动画中的实际位置。
+
+`anim web` 会输出 `animation.json` 与 `atlas.webp`。使用 `--player` 可额外生成最小化、
+可直接打开的独立播放器。需要挂载独立动画实体时，追加 `--scene ./scene.json`：
+
+```json
+{
+  "version": 1,
+  "entities": [{
+    "id": "left-pom",
+    "anim": "./pom.zip",
+    "animation": "idle_loop",
+    "follow": { "layerName": "HAT", "buildFrame": 0, "x": -75, "y": -12 },
+    "zOffset": 0.01
+  }]
+}
+```
+
+配置中的路径相对场景文件解析；`zOffset` 为正时 follower 位于挂点后方，为负时位于前方。每个实体保留独立播放周期，因此 66 帧主体与 77 帧
+follower 不会互相强制重置。输出的 `scene.json` 引用主体和子实体动画包，`index.html`
+仍为可直接打开的自包含预览器。
+
 
 导出料理目录：
 

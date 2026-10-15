@@ -36,6 +36,14 @@ export function createDstAnimationPlayer(
   let previousTimestamp: number | null = null;
   let destroyed = false;
 
+  const isLoopingScene = () => loop && manifest.scene?.rootAnimation === animation;
+  const frameAtCurrentTime = (clip: NonNullable<WebAnimationManifest["animations"][string]>) => {
+    const time = isLoopingScene()
+      ? ((currentTime % clip.duration) + clip.duration) % clip.duration
+      : currentTime;
+    return animationFrameAtTime(clip, time);
+  };
+
   const state = (): DstAnimationFrameState => {
     const clip = manifest.animations[animation];
     if (!clip) throw new Error(`找不到动画 ${animation}`);
@@ -43,16 +51,21 @@ export function createDstAnimationPlayer(
       animation,
       currentTime,
       duration: clip.duration,
-      frame: animationFrameAtTime(clip, currentTime),
+      frame: frameAtCurrentTime(clip),
       playing,
     };
   };
 
   const render = (): void => {
     assertActive();
+    const clip = manifest.animations[animation];
+    if (!clip) throw new Error(`找不到动画 ${animation}`);
+    const renderTime = !loop && manifest.scene?.rootAnimation === animation
+      ? Math.min(currentTime, Math.max(0, clip.duration - 1 / clip.frameRate))
+      : currentTime;
     renderDstAnimationFrame(context, manifest, atlas, {
       animation,
-      time: currentTime,
+      time: renderTime,
       fit: options.fit,
       padding: options.padding,
       maxScale: options.maxScale,
@@ -78,7 +91,9 @@ export function createDstAnimationPlayer(
       ));
       currentTime += elapsed * playbackRate;
       if (currentTime >= clip.duration) {
-        if (loop) currentTime %= clip.duration;
+        if (loop) {
+          if (!isLoopingScene()) currentTime %= clip.duration;
+        }
         else {
           currentTime = clip.duration;
           playing = false;
@@ -111,7 +126,7 @@ export function createDstAnimationPlayer(
     get frame() {
       const clip = manifest.animations[animation];
       if (!clip) return 0;
-      return animationFrameAtTime(clip, currentTime);
+      return frameAtCurrentTime(clip);
     },
     get playing() {
       return playing;
@@ -121,7 +136,7 @@ export function createDstAnimationPlayer(
       if (playing) return;
       const clip = manifest.animations[animation];
       if (!clip) throw new Error(`找不到动画 ${animation}`);
-      if (currentTime >= clip.duration) currentTime = 0;
+      if (currentTime >= clip.duration && !isLoopingScene()) currentTime = 0;
       playing = true;
       previousTimestamp = null;
       scheduleNextFrame();
@@ -139,7 +154,9 @@ export function createDstAnimationPlayer(
       if (!Number.isFinite(time)) throw new Error(`动画时间无效：${time}`);
       const clip = manifest.animations[animation];
       if (!clip) throw new Error(`找不到动画 ${animation}`);
-      currentTime = Math.min(clip.duration, Math.max(0, time));
+      currentTime = isLoopingScene()
+        ? Math.max(0, time)
+        : Math.min(clip.duration, Math.max(0, time));
       render();
     },
     setAnimation(nextAnimation: string) {

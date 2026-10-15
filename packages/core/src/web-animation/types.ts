@@ -20,6 +20,9 @@ export type WebAnimationElement = {
   sprite: string;
   transform: WebAnimationTransform;
   z: number;
+  layerName?: string;
+  symbolName?: string;
+  buildFrame?: number;
 };
 
 export type WebAnimationFrame = {
@@ -32,6 +35,29 @@ export type WebAnimationClip = {
   frames: WebAnimationFrame[];
 };
 
+export type WebAnimationEntityFollow = {
+  layerName?: string;
+  symbolName?: string;
+  buildFrame?: number;
+  occurrence?: number;
+  x?: number;
+  y?: number;
+  scale?: number;
+};
+
+export type WebAnimationSceneEntity = {
+  id: string;
+  animation: string;
+  follow: WebAnimationEntityFollow;
+  zOffset?: number;
+  timeOffset?: number;
+};
+
+export type WebAnimationScene = {
+  rootAnimation: string;
+  entities: WebAnimationSceneEntity[];
+};
+
 export type WebAnimationManifest = {
   format: "dstjs-web-animation";
   version: 1;
@@ -42,6 +68,7 @@ export type WebAnimationManifest = {
   };
   sprites: Record<string, WebAnimationSprite>;
   animations: Record<string, WebAnimationClip>;
+  scene?: WebAnimationScene;
 };
 
 export type WebAnimationPackage = {

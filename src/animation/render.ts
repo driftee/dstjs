@@ -7,7 +7,14 @@ import {
   type AnimationColour,
 } from "./colour.js";
 import { pruneTransparentImage } from "../image/prune.js";
-import type { Animation, AnimationElement, BuildFrame, BuildSymbol, Rectangle } from "./types.js";
+import { createBuildSymbolResolver } from "./symbol-resolver.js";
+import type {
+  Animation,
+  AnimationElement,
+  BuildFrame,
+  BuildSymbol,
+  Rectangle,
+} from "./types.js";
 
 const MAX_RENDER_DIMENSION = 8_192;
 const MAX_RENDER_PIXELS = 64 * 1024 * 1024;
@@ -26,6 +33,7 @@ export type RenderAnimationFrameOptions = {
   bounds?: Rectangle;
   skipMissingSymbols?: boolean;
   hiddenLayers?: readonly string[];
+  hiddenSymbols?: readonly string[];
   multColour?: AnimationColour;
   addColour?: AnimationColour;
   cropContent?: boolean;
@@ -83,57 +91,43 @@ export async function renderAnimationFrame(
   }
   const left = bounds.x - bounds.width / 2 - padding;
   const top = bounds.y - bounds.height / 2 - padding;
-  const symbols = new Map(bundle.build.symbols.map((symbol) => [symbol.hash, symbol]));
-  const atlases = bundle.build.atlases.map((atlasName) => {
-    const atlas = bundle.atlases.get(atlasName);
-    if (!atlas) throw new Error(`找不到 atlas ${atlasName}`);
-    return atlas;
-  });
-  const symbolsByName = new Map<string, { symbol: BuildSymbol; atlases: Parameters<typeof rasterizeBuildFrame>[1] }>(
-    bundle.build.symbols.flatMap((symbol) =>
-      symbol.name ? [[symbol.name, { symbol, atlases }] as const] : []),
-  );
-  for (const overrideBuild of options.symbolOverrideBuilds ?? []) {
-    const overrideAtlases = overrideBuild.build.atlases.map((atlasName) => {
-      const atlas = overrideBuild.atlases.get(atlasName);
-      if (!atlas) throw new Error(`找不到 atlas ${atlasName}`);
-      return atlas;
-    });
-    for (const symbol of overrideBuild.build.symbols) {
-      if (symbol.name) symbolsByName.set(symbol.name, { symbol, atlases: overrideAtlases });
-    }
-  }
+  const symbolResolver = createBuildSymbolResolver(bundle, options.symbolOverrideBuilds);
   const imageCache = new Map<string, Promise<RasterizedSprite>>();
-  const hiddenLayers = new Set(options.hiddenLayers ?? []);
+  const hiddenLayers = new Set((options.hiddenLayers ?? []).map(normalizeLayerName));
+  const hiddenSymbols = new Set(options.hiddenSymbols ?? []);
 
   const elements = sortAnimationElementsForDraw(frame.elements)
-    .filter((element) => !element.layerName || !hiddenLayers.has(element.layerName));
+    .filter((element) =>
+      !element.layerName || !hiddenLayers.has(normalizeLayerName(element.layerName)));
   const renderedElements: Array<{
     cacheKey: string;
     element: AnimationElement;
     sprite: RasterizedSprite;
   }> = [];
   for (const element of elements) {
-    const originalSymbol = symbols.get(element.symbolHash);
-    const originalSymbolName = originalSymbol?.name ?? element.symbolName;
+    const originalSource = symbolResolver.resolveHash(element.symbolHash);
+    const originalSymbolName = element.symbolName ?? originalSource?.symbol.name;
+    if (originalSymbolName && hiddenSymbols.has(originalSymbolName)) continue;
     const overrideName = originalSymbolName
       ? options.symbolOverrides?.[originalSymbolName]
       : undefined;
-    const overrideSource = overrideName ? symbolsByName.get(overrideName) : undefined;
-    const symbol = overrideSource?.symbol ?? originalSymbol;
-    if (!symbol || (overrideName && !overrideSource)) {
+    const source = overrideName
+      ? symbolResolver.resolveName(overrideName)
+      : originalSource;
+    if (!source) {
       if (options.skipMissingSymbols) continue;
       if (overrideName) throw new Error(`Build 中找不到 override symbol ${overrideName}`);
       throw new Error(`Build 中找不到 symbol 0x${element.symbolHash.toString(16)}`);
     }
+    const { symbol } = source;
     const buildFrame = selectBuildFrame(symbol, element.buildFrame, options.skipMissingSymbols);
     if (!buildFrame) continue;
     if (buildFrame.vertices.length === 0) {
       if (options.skipMissingSymbols) continue;
       throw new Error("Build frame 的顶点必须是非空三角形列表");
     }
-    const sourceAtlases = overrideSource?.atlases ?? atlases;
-    const cacheKey = `${overrideSource ? overrideName : symbol.hash}:${buildFrame.frameNumber}`;
+    const sourceAtlases = source.atlases;
+    const cacheKey = `${symbol.hash}:${buildFrame.frameNumber}`;
     let image = imageCache.get(cacheKey);
     if (!image) {
       image = renderBuildFrameImage(buildFrame, sourceAtlases, {
@@ -188,6 +182,10 @@ export async function renderAnimationFrame(
     animation,
     frameIndex: options.frameIndex,
   };
+}
+
+function normalizeLayerName(name: string): string {
+  return name.toLowerCase();
 }
 
 export async function renderAnimationGif(

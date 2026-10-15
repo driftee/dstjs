@@ -2,8 +2,7 @@ import type {
   WebAnimationManifest,
 } from "@driftee/dstjs-core/web-animation";
 import {
-  animationFrameAtTime,
-  selectWebAnimation,
+  webAnimationElementsAtTime,
   webAnimationBounds,
 } from "@driftee/dstjs-core/web-animation";
 
@@ -18,17 +17,18 @@ export function renderDstAnimationFrame(
   atlas: CanvasImageSource,
   options: RenderDstAnimationFrameOptions,
 ): number {
-  const clip = selectWebAnimation(manifest, options.animation);
-  const frameIndex = animationFrameAtTime(clip, options.time);
-  const frame = clip.frames[frameIndex];
-  if (!frame) throw new Error(`动画 ${options.animation} 不包含可渲染帧`);
+  const { frameIndex, elements } = webAnimationElementsAtTime(
+    manifest,
+    options.animation,
+    options.time,
+  );
 
   const padding = options.padding ?? 0;
   const maxScale = options.maxScale ?? Number.POSITIVE_INFINITY;
   if (!Number.isFinite(padding) || padding < 0) throw new Error(`播放器边距无效：${padding}`);
   if (!(maxScale > 0)) throw new Error(`播放器最大缩放无效：${maxScale}`);
 
-  const bounds = webAnimationBounds(manifest, clip);
+  const bounds = webAnimationBounds(manifest, options.animation);
   const width = context.canvas.width;
   const height = context.canvas.height;
   const availableWidth = Math.max(1, width - padding * 2);
@@ -56,7 +56,7 @@ export function renderDstAnimationFrame(
     width / 2 - centerX * scale,
     height / 2 - centerY * scale,
   );
-  for (const element of frame.elements) {
+  for (const element of elements) {
     const sprite = manifest.sprites[element.sprite];
     if (!sprite) throw new Error(`动画 ${options.animation} 引用了不存在的 Sprite ${element.sprite}`);
     const [a, b, c, d, tx, ty] = element.transform;

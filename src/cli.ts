@@ -16,7 +16,12 @@ import {
 } from "./animation/index.js";
 import { extractAtlas, extractAtlasFiles, type AtlasManifest } from "./atlas/extract.js";
 import { writeCookingCatalog } from "./cooking/index.js";
-import { GameAssetSource } from "./game/source.js";
+import {
+  GameAssetSource,
+  loadChineseTranslations,
+  loadModNameTranslations,
+  resolveDataDirectory,
+} from "./game/index.js";
 import { pruneTransparentImage, type PruneOutputFormat } from "./image/index.js";
 import {
   compileLottiePackage,
@@ -42,11 +47,16 @@ import {
   writeTurfOceanAssets,
 } from "./turf/index.js";
 import {
+  compileAnimationEntityScenePackage,
   compileWebAnimation,
+  createAnimationEntityPlayerHtml,
   createAnimationPlayerHtml,
+  parseAnimationEntitySceneConfig,
+  type AnimationEntitySceneManifest,
   createPetalSceneHtml,
 } from "./web-animation/index.js";
 import { formatCliHelp, resolveHelpTopic } from "./cli-help.js";
+import { buildManifest } from "./animation/build-manifest.js";
 
 type Arguments = {
   command: string;
@@ -57,12 +67,14 @@ type Arguments = {
   anim: string | null;
   build: string | null;
   overrideBuilds: string[];
+  overrideBuildSymbols: string[];
   animations: string[];
   bank: string | null;
   facing: number | null;
   frame: number;
   scale: number;
   padding: number | null;
+  renderPadding: number | null;
   paddingTop: number | null;
   paddingRight: number | null;
   paddingBottom: number | null;
@@ -78,9 +90,11 @@ type Arguments = {
   skipMissingSymbols: boolean;
   cropContent: boolean;
   hiddenLayers: string[];
+  hiddenSymbols: string[];
   multColour: AnimationColour | null;
   addColour: AnimationColour | null;
   title: string | null;
+  scene: string | null;
 };
 
 async function main(): Promise<void> {
@@ -108,6 +122,31 @@ async function main(): Promise<void> {
     if (!gamePath) return printUsage(1);
     await extractGame(path.resolve(gamePath), path.resolve(arguments_.output), arguments_.matches);
     return;
+  }
+
+  if (arguments_.command === "names") {
+    const [action, inputPath, ...codes] = arguments_.positional;
+    if (!action || !inputPath || codes.length === 0) return printUsage(1);
+    if (action === "resolve") {
+      const dataDirectory = await resolveDataDirectory(path.resolve(inputPath));
+      const translations = await loadChineseTranslations(dataDirectory);
+      console.log(JSON.stringify({
+        locale: "zh-CN",
+        kind: "base",
+        items: codes.map(code => translations.resolveName(code)),
+      }, null, 2));
+      return;
+    }
+    if (action === "resolve-mod") {
+      const translations = await loadModNameTranslations(path.resolve(inputPath));
+      console.log(JSON.stringify({
+        locale: "zh-CN",
+        kind: "mod",
+        items: codes.map(code => translations.resolveName(code)),
+      }, null, 2));
+      return;
+    }
+    throw new Error(`未知 names 操作：${action}`);
   }
 
   if (arguments_.command === "texture") {
@@ -317,6 +356,25 @@ async function main(): Promise<void> {
     const [action, archivePath] = arguments_.positional;
     const animationArchivePath = arguments_.anim ?? archivePath;
     if (!action || !animationArchivePath) return printUsage(1);
+    if (action === "inspect-build") {
+      const { build } = await openBuildBundle(path.resolve(arguments_.build ?? animationArchivePath));
+      console.log(JSON.stringify(buildManifest(build), null, 2));
+      return;
+    }
+    if (action === "inspect-elements") {
+      const animationFile = await openAnimationFile(path.resolve(animationArchivePath));
+      const animations = animationFile.animations.filter((animation) =>
+        (arguments_.animations.length === 0 || arguments_.animations.includes(animation.name))
+        && (arguments_.bank == null || arguments_.bank === animation.bankName)
+        && (arguments_.facing == null || arguments_.facing === animation.facing));
+      if (animations.length === 0) throw new Error("找不到匹配的动画");
+      console.log(JSON.stringify({
+        format: "dstjs-animation-elements:v1",
+        version: animationFile.version,
+        animations,
+      }, null, 2));
+      return;
+    }
     if (action === "inspect") {
       const animationFile = await openAnimationFile(path.resolve(animationArchivePath));
       console.log(JSON.stringify({
@@ -334,11 +392,27 @@ async function main(): Promise<void> {
     const bundle = await openAnimationBundle(path.resolve(animationArchivePath), {
       buildFilename: arguments_.build ? path.resolve(arguments_.build) : undefined,
     });
-    const symbolOverrideBuilds = await Promise.all(
-      arguments_.overrideBuilds.map((filename) => openBuildBundle(path.resolve(filename))),
-    );
+    const symbolOverrideBuilds = await Promise.all([
+      ...arguments_.overrideBuilds.map((filename) => openBuildBundle(path.resolve(filename))),
+      ...arguments_.overrideBuildSymbols.map(async (specification) => {
+        const separator = specification.lastIndexOf(":");
+        if (separator <= 0 || separator === specification.length - 1) {
+          throw new Error(`--override-build-symbol 应为 <zip>:<symbol>：${specification}`);
+        }
+        const filename = specification.slice(0, separator);
+        const symbolName = specification.slice(separator + 1);
+        const bundle = await openBuildBundle(path.resolve(filename));
+        const symbols = bundle.build.symbols.filter((symbol) => symbol.name === symbolName);
+        if (symbols.length === 0) {
+          throw new Error(`override build ${filename} 中找不到 symbol ${symbolName}`);
+        }
+        return { ...bundle, build: { ...bundle.build, symbols } };
+      }),
+    ]);
     if (action === "web") {
       if (arguments_.demo && arguments_.player) throw new Error("--demo 与 --player 不能同时使用");
+      if (arguments_.scene && !arguments_.player) throw new Error("--scene 需要同时使用 --player");
+      if (arguments_.scene && arguments_.demo) throw new Error("--scene 与 --demo 不能同时使用");
       const outputDirectory = path.resolve(arguments_.output);
       const animationPackage = await compileWebAnimation(bundle, {
         animations: arguments_.animations,
@@ -348,6 +422,7 @@ async function main(): Promise<void> {
         symbolOverrideBuilds,
         skipMissingSymbols: arguments_.skipMissingSymbols,
         hiddenLayers: arguments_.hiddenLayers,
+        hiddenSymbols: arguments_.hiddenSymbols,
         multColour: arguments_.multColour ?? undefined,
         addColour: arguments_.addColour ?? undefined,
         cropContent: arguments_.cropContent,
@@ -366,6 +441,7 @@ async function main(): Promise<void> {
             symbolOverrideBuilds,
             skipMissingSymbols: arguments_.skipMissingSymbols,
             hiddenLayers: arguments_.hiddenLayers,
+            hiddenSymbols: arguments_.hiddenSymbols,
             multColour: arguments_.multColour ?? undefined,
             addColour: arguments_.addColour ?? undefined,
             cropContent: arguments_.cropContent,
@@ -374,26 +450,87 @@ async function main(): Promise<void> {
           }),
         ] as const)))
         : {};
+      const sceneConfigPath = arguments_.scene ? path.resolve(arguments_.scene) : null;
+      const sceneConfig = sceneConfigPath
+        ? parseAnimationEntitySceneConfig(JSON.parse(await readFile(sceneConfigPath, "utf8")))
+        : null;
+      const sceneDirectory = sceneConfigPath ? path.dirname(sceneConfigPath) : process.cwd();
+      const compiledEntities = sceneConfig
+        ? await Promise.all(sceneConfig.entities.map(async (entity) => {
+          const entityBundle = await openAnimationBundle(path.resolve(sceneDirectory, entity.anim), {
+            buildFilename: entity.build ? path.resolve(sceneDirectory, entity.build) : undefined,
+          });
+          return {
+            ...entity,
+            package: await compileWebAnimation(entityBundle, {
+              animations: [entity.animation],
+              bank: entity.bank,
+              facing: entity.facing,
+              skipMissingSymbols: entity.skipMissingSymbols,
+              hiddenLayers: entity.hiddenLayers,
+              hiddenSymbols: entity.hiddenSymbols,
+              cropContent: arguments_.cropContent,
+              cropAlphaThreshold: arguments_.alphaThreshold,
+              cropPadding: arguments_.padding ?? undefined,
+            }),
+          };
+        }))
+        : [];
+      const initialAnimation = arguments_.animations[0]
+        ?? Object.keys(animationPackage.manifest.animations)[0];
+      if (!initialAnimation) throw new Error("Web 动画不包含可播放动作");
+      const exportedPackage = sceneConfig
+        ? await compileAnimationEntityScenePackage(animationPackage, initialAnimation, compiledEntities)
+        : animationPackage;
+      const sceneManifest: AnimationEntitySceneManifest | null = sceneConfig ? {
+        format: "dstjs-web-animation-scene",
+        version: 1,
+        root: { manifest: "animation.json", animation: initialAnimation },
+        entities: compiledEntities.map((entity) => ({
+          id: entity.id,
+          manifest: `entities/${entity.id}/animation.json`,
+          animation: entity.animation,
+          follow: entity.follow,
+          zOffset: entity.zOffset ?? 0,
+          timeOffset: entity.timeOffset ?? 0,
+        })),
+      } : null;
       await mkdir(outputDirectory, { recursive: true });
+      await Promise.all(compiledEntities.map((entity) =>
+        mkdir(path.join(outputDirectory, "entities", entity.id), { recursive: true })));
       await Promise.all([
-        writeFile(path.join(outputDirectory, "animation.json"), `${JSON.stringify(animationPackage.manifest)}\n`, "utf8"),
-        writeFile(path.join(outputDirectory, animationPackage.manifest.atlas.file), animationPackage.atlas),
+        writeFile(path.join(outputDirectory, "animation.json"), `${JSON.stringify(exportedPackage.manifest)}\n`, "utf8"),
+        writeFile(path.join(outputDirectory, exportedPackage.manifest.atlas.file), exportedPackage.atlas),
+        ...compiledEntities.flatMap((entity) => {
+          const directory = path.join(outputDirectory, "entities", entity.id);
+          return [
+            writeFile(path.join(directory, "animation.json"), `${JSON.stringify(entity.package.manifest)}\n`, "utf8"),
+            writeFile(path.join(directory, entity.package.manifest.atlas.file), entity.package.atlas),
+          ];
+        }),
+        ...(sceneManifest
+          ? [writeFile(path.join(outputDirectory, "scene.json"), `${JSON.stringify(sceneManifest, null, 2)}\n`, "utf8")]
+          : []),
         arguments_.demo
           ? writeFile(path.join(outputDirectory, "index.html"), createPetalSceneHtml(animationPackage, {
             variants: variantPackages,
             initialVariant: variantDefinitions[0]?.name,
           }), "utf8")
           : arguments_.player
-            ? writeFile(path.join(outputDirectory, "index.html"), createAnimationPlayerHtml(animationPackage, {
-              title: arguments_.title ?? path.basename(
-                animationArchivePath,
-                path.extname(animationArchivePath),
-              ),
-              initialAnimation: arguments_.animations[0],
-            }), "utf8")
-          : Promise.resolve(),
+            ? writeFile(path.join(outputDirectory, "index.html"), sceneConfig
+              ? createAnimationEntityPlayerHtml(animationPackage, {
+                title: arguments_.title ?? path.basename(animationArchivePath, path.extname(animationArchivePath)),
+                initialAnimation,
+                entities: compiledEntities,
+              })
+              : createAnimationPlayerHtml(animationPackage, {
+                title: arguments_.title ?? path.basename(animationArchivePath, path.extname(animationArchivePath)),
+                initialAnimation,
+              }), "utf8")
+            : Promise.resolve(),
       ]);
       console.log(`已输出 ${Object.keys(animationPackage.manifest.animations).length} 段 Web 动画到 ${outputDirectory}。`);
+      if (sceneConfig) console.log(`多实体场景：${path.join(outputDirectory, "scene.json")}`);
       if (arguments_.demo) console.log(`场景演示：${path.join(outputDirectory, "index.html")}`);
       if (arguments_.player) console.log(`动画播放器：${path.join(outputDirectory, "index.html")}`);
       return;
@@ -407,6 +544,8 @@ async function main(): Promise<void> {
         symbolOverrides: parseOverrides(arguments_.overrides),
         symbolOverrideBuilds,
         skipMissingSymbols: arguments_.skipMissingSymbols,
+        hiddenLayers: arguments_.hiddenLayers,
+        hiddenSymbols: arguments_.hiddenSymbols,
         multColour: arguments_.multColour ?? undefined,
         addColour: arguments_.addColour ?? undefined,
       });
@@ -436,6 +575,7 @@ async function main(): Promise<void> {
     const animationName = requireSingleAnimation(arguments_.animations, action);
     if (action === "frame") {
       const rendered = await renderAnimationFrame(bundle, {
+        padding: arguments_.renderPadding ?? undefined,
         animation: animationName,
         bank: arguments_.bank ?? undefined,
         facing: arguments_.facing ?? undefined,
@@ -445,6 +585,7 @@ async function main(): Promise<void> {
         scale: arguments_.scale,
         skipMissingSymbols: arguments_.skipMissingSymbols,
         hiddenLayers: arguments_.hiddenLayers,
+        hiddenSymbols: arguments_.hiddenSymbols,
         multColour: arguments_.multColour ?? undefined,
         addColour: arguments_.addColour ?? undefined,
         cropContent: arguments_.cropContent,
@@ -480,6 +621,7 @@ async function main(): Promise<void> {
           bounds,
           skipMissingSymbols: arguments_.skipMissingSymbols,
           hiddenLayers: arguments_.hiddenLayers,
+          hiddenSymbols: arguments_.hiddenSymbols,
           multColour: arguments_.multColour ?? undefined,
           addColour: arguments_.addColour ?? undefined,
         });
@@ -501,6 +643,7 @@ async function main(): Promise<void> {
         scale: arguments_.scale,
         skipMissingSymbols: arguments_.skipMissingSymbols,
         hiddenLayers: arguments_.hiddenLayers,
+        hiddenSymbols: arguments_.hiddenSymbols,
         multColour: arguments_.multColour ?? undefined,
         addColour: arguments_.addColour ?? undefined,
       });
@@ -570,12 +713,14 @@ function parseArguments(values: string[]): Arguments {
   let anim: string | null = null;
   let build: string | null = null;
   const overrideBuilds: string[] = [];
+  const overrideBuildSymbols: string[] = [];
   const animations: string[] = [];
   let bank: string | null = null;
   let facing: number | null = null;
   let frame = 0;
   let scale = 1;
   let padding: number | null = null;
+  let renderPadding: number | null = null;
   let paddingTop: number | null = null;
   let paddingRight: number | null = null;
   let paddingBottom: number | null = null;
@@ -591,9 +736,11 @@ function parseArguments(values: string[]): Arguments {
   let skipMissingSymbols = false;
   let cropContent = false;
   const hiddenLayers: string[] = [];
+  const hiddenSymbols: string[] = [];
   let multColour: AnimationColour | null = null;
   let addColour: AnimationColour | null = null;
   let title: string | null = null;
+  let scene: string | null = null;
   for (let index = 0; index < rest.length; index += 1) {
     const value = rest[index];
     if (value === "--demo") {
@@ -622,6 +769,7 @@ function parseArguments(values: string[]): Arguments {
       || value === "--anim"
       || value === "--build"
       || value === "--override-build"
+      || value === "--override-build-symbol"
       || value === "--match"
       || value === "--animation"
       || value === "--stage"
@@ -630,6 +778,7 @@ function parseArguments(values: string[]): Arguments {
       || value === "--frame"
       || value === "--scale"
       || value === "--padding"
+      || value === "--render-padding"
       || value === "--padding-top"
       || value === "--padding-right"
       || value === "--padding-bottom"
@@ -638,11 +787,13 @@ function parseArguments(values: string[]): Arguments {
       || value === "--keyframe-mode"
       || value === "--keyframe-tolerance"
       || value === "--hide-layer"
+      || value === "--hide-symbol"
       || value === "--mult-colour"
       || value === "--add-colour"
       || value === "--override"
       || value === "--variant"
       || value === "--title"
+      || value === "--scene"
     ) {
       const optionValue = rest[index + 1];
       if (!optionValue) throw new Error(`${value} 缺少参数`);
@@ -651,6 +802,7 @@ function parseArguments(values: string[]): Arguments {
       else if (value === "--anim") anim = optionValue;
       else if (value === "--build") build = optionValue;
       else if (value === "--override-build") overrideBuilds.push(optionValue);
+      else if (value === "--override-build-symbol") overrideBuildSymbols.push(optionValue);
       else if (value === "--match") matches.push(optionValue);
       else if (value === "--animation" || value === "--stage") animations.push(optionValue);
       else if (value === "--bank") bank = optionValue;
@@ -658,6 +810,10 @@ function parseArguments(values: string[]): Arguments {
       else if (value === "--frame") frame = parseNumberOption(value, optionValue, true);
       else if (value === "--scale") scale = parseNumberOption(value, optionValue, false);
       else if (value === "--padding") padding = parseNumberOption(value, optionValue, true);
+      else if (value === "--render-padding") {
+        renderPadding = parseNumberOption(value, optionValue, true);
+        if (renderPadding < 0 || renderPadding > 1_024) throw new Error(`${value} 必须在 0 到 1024 之间`);
+      }
       else if (value === "--padding-top") paddingTop = parseNumberOption(value, optionValue, true);
       else if (value === "--padding-right") paddingRight = parseNumberOption(value, optionValue, true);
       else if (value === "--padding-bottom") paddingBottom = parseNumberOption(value, optionValue, true);
@@ -669,10 +825,12 @@ function parseArguments(values: string[]): Arguments {
         if (keyframeTolerance <= 0) throw new Error(`${value} 必须大于 0`);
       }
       else if (value === "--hide-layer") hiddenLayers.push(optionValue);
+      else if (value === "--hide-symbol") hiddenSymbols.push(optionValue);
       else if (value === "--mult-colour") multColour = parseAnimationColour(optionValue, value);
       else if (value === "--add-colour") addColour = parseAnimationColour(optionValue, value);
       else if (value === "--override") overrides.push(optionValue);
       else if (value === "--title") title = optionValue;
+      else if (value === "--scene") scene = optionValue;
       else variants.push(optionValue);
       index += 1;
     } else if (value?.startsWith("--")) {
@@ -690,12 +848,14 @@ function parseArguments(values: string[]): Arguments {
     anim,
     build,
     overrideBuilds,
+    overrideBuildSymbols,
     animations,
     bank,
     facing,
     frame,
     scale,
     padding,
+    renderPadding,
     paddingTop,
     paddingRight,
     paddingBottom,
@@ -711,9 +871,11 @@ function parseArguments(values: string[]): Arguments {
     skipMissingSymbols,
     cropContent,
     hiddenLayers,
+    hiddenSymbols,
     multColour,
     addColour,
     title,
+    scene,
   };
 }
 

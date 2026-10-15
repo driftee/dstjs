@@ -165,6 +165,87 @@ describe("DST.js Canvas player", () => {
     expect(ended).toHaveLength(1);
   });
 
+
+  it("renders scene followers on independent timelines without resetting the total clock", () => {
+    const scene = manifest();
+    scene.animations.idle!.frames[0]!.elements[0] = {
+      ...scene.animations.idle!.frames[0]!.elements[0]!,
+      layerName: "HAT",
+      symbolName: "swap_hat",
+      buildFrame: 0,
+    };
+    scene.animations.idle!.frames[1]!.elements[0] = {
+      ...scene.animations.idle!.frames[1]!.elements[0]!,
+      layerName: "HAT",
+      symbolName: "swap_hat",
+      buildFrame: 0,
+    };
+    scene.animations.pom = {
+      frameRate: 10,
+      duration: 0.3,
+      frames: [0, 10, 20].map((x) => ({
+        elements: [{ sprite: "body", transform: [1, 0, 0, 1, x, 0], z: 0 }],
+      })),
+    };
+    scene.scene = {
+      rootAnimation: "idle",
+      entities: [{
+        id: "pom",
+        animation: "pom",
+        follow: { layerName: "HAT", x: 5 },
+        zOffset: 0.01,
+      }],
+    };
+
+    const direct = fakeContext();
+    renderDstAnimationFrame(direct.context, scene, {} as CanvasImageSource, {
+      animation: "idle",
+      time: 0.25,
+      maxScale: 1,
+    });
+    const transforms = direct.calls.filter(({ name }) => name === "transform");
+    expect(transforms.map(({ arguments: values }) => values)).toEqual([
+      [1, 0, 0, 1, 25, 0],
+      [1, 0, 0, 1, 0, 0],
+    ]);
+
+    const clock = fakeScheduler();
+    const player = createDstAnimationPlayer(
+      fakeContext().context,
+      scene,
+      {} as CanvasImageSource,
+      { scheduler: clock.scheduler, loop: true },
+    );
+    player.play();
+    clock.advance(0);
+    clock.advance(100);
+    clock.advance(200);
+    clock.advance(300);
+    expect(player.currentTime).toBeCloseTo(0.3);
+    expect(player.currentTime).toBeGreaterThan(player.duration);
+
+    expect(webAnimationBounds(scene, scene.animations.idle!)).toEqual(
+      webAnimationBounds(scene, "idle"),
+    );
+
+    const finalContext = fakeContext();
+    const finalClock = fakeScheduler();
+    const finalPlayer = createDstAnimationPlayer(
+      finalContext.context,
+      scene,
+      {} as CanvasImageSource,
+      { scheduler: finalClock.scheduler, loop: false },
+    );
+    finalPlayer.play();
+    finalClock.advance(0);
+    finalClock.advance(100);
+    finalClock.advance(200);
+    const finalTransforms = finalContext.calls.filter(({ name }) => name === "transform").slice(-2);
+    expect(finalTransforms.map(({ arguments: values }) => values)).toEqual([
+      [1, 0, 0, 1, 19, 0],
+      [1, 0, 0, 1, 4, 0],
+    ]);
+  });
   it("rejects malformed manifests before rendering", () => {
     const { context } = fakeContext();
     const invalid = { ...manifest(), version: 2 };

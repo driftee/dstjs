@@ -11,6 +11,7 @@ const ROOT_HELP = `DST.js - 解析、提取、转换和渲染《饥荒联机版�
   texture   解码 KTEX 纹理
   image     处理导出的图片
   game      从游戏目录批量提取资源
+  names     解析原版或模组的正式名称
   cooking   导出料理资料
   turf      导出和诊断地皮资源
 
@@ -28,6 +29,8 @@ const ANIM_HELP = `用法：
 
 操作：
   inspect   列出动画名称、bank、facing、帧率和帧数
+  inspect-build 列出完整 build 部件、帧编号、尺寸和原点
+  inspect-elements 导出 ANIM 原始帧、部件引用、图层与变换
   frame     导出指定动画的一帧 PNG
   frames    导出指定动画的全部 PNG 帧
   gif       导出指定动画的 GIF
@@ -38,10 +41,12 @@ const ANIM_HELP = `用法：
   --animation <名称>         选择动画；web 可重复使用此参数
   --build <build.zip>        使用独立 build 包
   --override-build <zip>     添加 symbol override build，可重复
+  --override-build-symbol <zip>:<symbol> 仅从 override build 添加指定 symbol，可重复
   --bank <bank>              选择 bank
   --facing <编号>            选择 facing
   --override <原名=目标名>   替换 symbol，可重复
   --hide-layer <名称>        隐藏图层，可重复
+  --hide-symbol <名称>       隐藏 symbol，可重复
   --skip-missing-symbols     忽略 build 中缺失的 symbol
   --crop-content             按非透明内容裁剪 frame 或 Web sprite
   --mult-colour <r,g,b,a>    模拟 AnimState:SetMultColour
@@ -58,6 +63,16 @@ const ANIM_HELP = `用法：
 运行 dst anim <操作> --help 查看操作专属参数。`;
 
 const ANIM_ACTION_HELP: Record<string, string> = {
+  "inspect-elements": `用法：
+  dst anim inspect-elements <anim.zip> [--animation <名称>] [--bank <bank>] [--facing <编号>]
+
+导出筛选后的完整 ANIM 帧及 symbol/layer 名称与哈希、buildFrame、变换和 z。
+不依赖 build；保留未解析名称的哈希，不隐藏缺失部件。`,
+  "inspect-build": `用法：
+  dst anim inspect-build <build.zip>
+
+输出完整 BILD 的 symbol、frameNumber、duration、局部 bounds、原点和图集索引。
+不需要 anim.bin；不是单个动画使用的部件子集。方向须与 ANIM 引用交叉核实。`,
   inspect: `用法：
   dst anim inspect <animation.zip>
   dst anim inspect --anim <anim.zip>
@@ -73,16 +88,19 @@ const ANIM_ACTION_HELP: Record<string, string> = {
   --anim <anim.zip>          使用拆分的动画包
   --build <build.zip>        使用独立 build 包
   --override-build <zip>     添加 symbol override build，可重复
+  --override-build-symbol <zip>:<symbol> 仅从 override build 添加指定 symbol，可重复
   --bank <bank>              选择 bank
   --facing <编号>            选择 facing
   --frame <序号>             帧序号，默认 0
   --scale <倍数>             输出倍率，默认 1
   --override <原名=目标名>   替换 symbol，可重复
   --hide-layer <名称>        隐藏图层，可重复
+  --hide-symbol <名称>       隐藏 symbol，可重复
   --skip-missing-symbols     忽略缺失 symbol
   --crop-content             按非透明内容裁剪最终 PNG
   --alpha-threshold <0-255>  裁剪透明阈值，默认 0
   --padding <像素>           裁剪后保留的透明边距，默认 0
+  --render-padding <像素>    渲染前扩展画布边距，默认 2，最大 1024
   --mult-colour <r,g,b,a>    模拟 AnimState:SetMultColour
   --add-colour <r,g,b,a>     模拟 AnimState:SetAddColour
   --output <PNG>             输出路径
@@ -100,7 +118,7 @@ const ANIM_ACTION_HELP: Record<string, string> = {
   dst anim gif <animation.zip> --animation <名称> [参数]
 
 支持 --anim、--build、--override-build、--bank、--facing、--scale、
---override、--hide-layer、--skip-missing-symbols、--mult-colour、
+--override、--hide-layer、--hide-symbol、--skip-missing-symbols、--mult-colour、
 --add-colour 和 --output。
 GIF 不支持半透明 alpha；--mult-colour 的第 4 项必须为 1。
 
@@ -128,6 +146,7 @@ GIF 不支持半透明 alpha；--mult-colour 的第 4 项必须为 1。
   --demo                     同时生成场景演示
   --player                   同时生成动画播放器
   --title <标题>             设置播放器标题
+  --scene <JSON>             为播放器添加独立 follower 实体
   --variant <名称:原名=目标名>
   --crop-content             裁剪各 sprite 并补偿原点
   --alpha-threshold <0-255>  裁剪透明阈值，默认 0
@@ -136,7 +155,8 @@ GIF 不支持半透明 alpha；--mult-colour 的第 4 项必须为 1。
 同时支持动画通用的 build、bank、facing、override、隐藏图层、颜色和输出参数。
 
 示例：
-  dst anim web ./anim.zip --animation idle --output ./representative`,
+  dst anim web ./anim.zip --animation idle --output ./representative
+  dst anim web ./anim.zip --animation idle --player --scene ./scene.json --output ./preview`,
 };
 
 const COMMAND_HELP: Record<string, string> = {
@@ -148,6 +168,21 @@ const COMMAND_HELP: Record<string, string> = {
   dst game <游戏目录或 data 目录> [--match <名称>]... [--output <目录>]
 
 从本地游戏资源中批量提取名称匹配的 Atlas。`,
+  names: `用法：
+  dst names resolve <游戏目录或 data 目录> <prefab>...
+  dst names resolve-mod <模组目录> <prefab>...
+
+resolve 从原版 chinese_s.po 解析正式中文名，命中时置信度为 EXACT。
+resolve-mod 静态扫描模组 Lua 中的 STRINGS.NAMES 字面量赋值：
+- 中文候选唯一时返回 STATIC，仍需结合语言分支复核。
+- 多个不同中文候选时返回 AMBIGUOUS。
+- 无中文候选时返回 UNMATCHED。
+
+两种操作都输出 JSON，不会根据 prefab 自行翻译。
+
+示例：
+  dst names resolve "/path/to/Don't Starve Together" lunarplant_husk
+  dst names resolve-mod ./workshop-1234567890 ce_drill_notes`,
   texture: `用法：
   dst texture decode <texture.tex> [--output <PNG 或目录>]
 

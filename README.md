@@ -25,7 +25,8 @@ DST.js is distributed as a standalone Node.js package and command-line tool.
   per-side padding.
 - Read loose game image and portrait resources together with
   `data/databundles/images.zip` and `data/databundles/bigportraits.zip`.
-- Load Simplified Chinese asset names and recipe descriptions.
+- Load authoritative Simplified Chinese names and recipe descriptions from the
+  game PO catalog, and statically extract mod name candidates.
 - Decode ANIM v3/v4 and BILD v5/v6 files with bounded binary reads.
 - Inspect self-contained animation ZIP files and render PNG frames or frame
   sequences through an experimental renderer.
@@ -173,6 +174,25 @@ pnpm dev game "/path/to/Don't Starve Together" \
   --output ./output
 ```
 
+Resolve authoritative base-game Chinese names:
+
+```bash
+pnpm dev names resolve "/path/to/Don't Starve Together" \
+  lunarplant_husk twigs
+```
+
+Statically extract mod name candidates:
+
+```bash
+pnpm dev names resolve-mod ./workshop/1234567890 \
+  mod_item mod_creature
+```
+
+Base-game names are `EXACT` only when found in `chinese_s.po`. Mod results are
+reported as `STATIC`, `AMBIGUOUS`, or `UNMATCHED`; `STATIC` results still
+require inspection of the surrounding language branch. The command never
+translates a prefab name heuristically.
+
 Inspect and render an animation ZIP:
 
 ```bash
@@ -241,7 +261,28 @@ pnpm dev anim web ./swap.zip \
 
 The `anim web` command writes `animation.json` and `atlas.webp`. With `--demo`,
 it also writes a self-contained `index.html` that demonstrates scene
-orchestration independently of any Wiki implementation.
+orchestration independently of any Wiki implementation. With `--player`, it
+writes the minimal standalone player. Add `--scene ./scene.json` to attach
+independently timed follower entities to semantic parent layers or symbols:
+
+```json
+{
+  "version": 1,
+  "entities": [{
+    "id": "left-pom",
+    "anim": "./pom.zip",
+    "animation": "idle_loop",
+    "follow": { "layerName": "HAT", "buildFrame": 0, "x": -75, "y": -12 },
+    "zOffset": 0.01
+  }]
+}
+```
+
+Paths are resolved relative to the scene file. Positive `zOffset` values draw the follower behind the anchor; negative values draw it in front. Each entity keeps its own clip
+duration, so a 66-frame parent and a 77-frame follower do not reset each other.
+The generated `scene.json` references the root and entity Web animation
+packages, while `index.html` remains self-contained and can be opened directly.
+
 
 The target-neutral sprite animation package is also available as a public API.
 Each IR transform contains both an authoritative affine `matrix` and editable

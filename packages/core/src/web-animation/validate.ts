@@ -2,6 +2,7 @@ import type {
   WebAnimationClip,
   WebAnimationElement,
   WebAnimationManifest,
+  WebAnimationScene,
   WebAnimationSprite,
 } from "./types.js";
 
@@ -28,9 +29,53 @@ export function parseWebAnimationManifest(value: unknown): WebAnimationManifest 
   if (Object.keys(animations).length === 0) {
     throw new Error("Web Animation manifest 不包含动画");
   }
+  if (value.scene !== undefined) assertScene(value.scene, animations);
   return value as WebAnimationManifest;
 }
 
+function assertScene(
+  value: unknown,
+  animations: Readonly<Record<string, unknown>>,
+): asserts value is WebAnimationScene {
+  if (!isRecord(value)) throw new Error("Web Animation scene 信息无效");
+  assertString(value.rootAnimation, "scene.rootAnimation");
+  if (!(value.rootAnimation in animations)) {
+    throw new Error(`scene.rootAnimation 引用了不存在的动画 ${value.rootAnimation}`);
+  }
+  if (!Array.isArray(value.entities)) throw new Error("scene.entities 必须是数组");
+  const ids = new Set<string>();
+  for (const [index, item] of value.entities.entries()) {
+    if (!isRecord(item)) throw new Error(`scene.entities[${index}] 信息无效`);
+    assertString(item.id, `scene.entities[${index}].id`);
+    if (ids.has(item.id)) throw new Error(`scene entity ID 重复：${item.id}`);
+    ids.add(item.id);
+    assertString(item.animation, `scene.entities[${index}].animation`);
+    if (!(item.animation in animations)) {
+      throw new Error(`scene entity ${item.id} 引用了不存在的动画 ${item.animation}`);
+    }
+    if (!isRecord(item.follow)) throw new Error(`scene entity ${item.id}.follow 信息无效`);
+    if (item.follow.layerName === undefined && item.follow.symbolName === undefined) {
+      throw new Error(`scene entity ${item.id}.follow 需要 layerName 或 symbolName`);
+    }
+    if (item.follow.layerName !== undefined) {
+      assertString(item.follow.layerName, `${item.id}.follow.layerName`);
+    }
+    if (item.follow.symbolName !== undefined) {
+      assertString(item.follow.symbolName, `${item.id}.follow.symbolName`);
+    }
+    if (item.follow.buildFrame !== undefined) {
+      assertNonNegativeInteger(item.follow.buildFrame, `${item.id}.follow.buildFrame`);
+    }
+    if (item.follow.occurrence !== undefined) {
+      assertNonNegativeInteger(item.follow.occurrence, `${item.id}.follow.occurrence`);
+    }
+    if (item.follow.x !== undefined) assertFiniteNumber(item.follow.x, `${item.id}.follow.x`);
+    if (item.follow.y !== undefined) assertFiniteNumber(item.follow.y, `${item.id}.follow.y`);
+    if (item.follow.scale !== undefined) assertPositiveNumber(item.follow.scale, `${item.id}.follow.scale`);
+    if (item.zOffset !== undefined) assertFiniteNumber(item.zOffset, `${item.id}.zOffset`);
+    if (item.timeOffset !== undefined) assertFiniteNumber(item.timeOffset, `${item.id}.timeOffset`);
+  }
+}
 function assertSprite(spriteId: string, value: unknown): asserts value is WebAnimationSprite {
   if (!isRecord(value)) throw new Error(`Sprite ${spriteId} 信息无效`);
   assertNonNegativeNumber(value.x, `Sprite ${spriteId}.x`);
@@ -81,6 +126,15 @@ function assertElement(
     throw new Error(`动画 ${animationName} 第 ${frameIndex} 帧变换矩阵无效`);
   }
   assertFiniteNumber(value.z, `动画 ${animationName} 第 ${frameIndex} 帧 z`);
+  if (value.layerName !== undefined) {
+    assertString(value.layerName, `动画 ${animationName} 第 ${frameIndex} 帧 layerName`);
+  }
+  if (value.symbolName !== undefined) {
+    assertString(value.symbolName, `动画 ${animationName} 第 ${frameIndex} 帧 symbolName`);
+  }
+  if (value.buildFrame !== undefined) {
+    assertNonNegativeInteger(value.buildFrame, `动画 ${animationName} 第 ${frameIndex} 帧 buildFrame`);
+  }
 }
 
 function assertString(value: unknown, name: string): asserts value is string {
@@ -95,6 +149,11 @@ function assertPositiveNumber(value: unknown, name: string): asserts value is nu
 function assertNonNegativeNumber(value: unknown, name: string): asserts value is number {
   assertFiniteNumber(value, name);
   if (value < 0) throw new Error(`${name} 不能小于 0`);
+}
+
+function assertNonNegativeInteger(value: unknown, name: string): asserts value is number {
+  assertNonNegativeNumber(value, name);
+  if (!Number.isInteger(value)) throw new Error(`${name} 必须是整数`);
 }
 
 function assertFiniteNumber(value: unknown, name: string): asserts value is number {

@@ -40,5 +40,17 @@ describe("formatCliHelp", () => {
     const help = formatCliHelp(["anim", "web"]);
     expect(help).toContain("--crop-content");
     expect(help).toContain("--alpha-threshold <0-255>");
+    expect(help).toContain("--scene <JSON>");
+    expect(help).toContain("--player --scene ./scene.json");
+  });
+
+  it("documents authoritative base and static mod name resolution", () => {
+    const help = formatCliHelp(["names"]);
+    expect(help).toContain("dst names resolve <游戏目录或 data 目录> <prefab>...");
+    expect(help).toContain("dst names resolve-mod <模组目录> <prefab>...");
+    expect(help).toContain("EXACT");
+    expect(help).toContain("STATIC");
+    expect(help).toContain("AMBIGUOUS");
+    expect(help).toContain("不会根据 prefab 自行翻译");
   });
 });

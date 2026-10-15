@@ -57,6 +57,13 @@ export async function compileWebAnimationPackage(
           sprite: element.spriteId,
           transform: element.transform.matrix,
           z: element.z,
+          ...(element.layerName === null ? {} : { layerName: element.layerName }),
+          ...(typeof element.metadata?.dstSymbolName === "string"
+            ? { symbolName: element.metadata.dstSymbolName }
+            : {}),
+          ...(typeof element.metadata?.dstBuildFrame === "number"
+            ? { buildFrame: element.metadata.dstBuildFrame }
+            : {}),
         })),
       })),
     };

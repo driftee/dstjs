@@ -50,6 +50,23 @@ describe("DST animation binaries", () => {
     expect(result.vertices).toHaveLength(6);
   });
 
+  it("skips DST animation elements whose complete transform is NaN", () => {
+    const input = createAnimationBinary();
+    const sentinelOffset = 85;
+    for (let index = 0; index < 6; index += 1) input.writeFloatLE(Number.NaN, sentinelOffset + index * 4);
+
+    const result = parseAnimation(input);
+
+    expect(result.animations[0]?.frames[0]?.elements).toEqual([]);
+  });
+
+  it("rejects partially invalid DST animation transforms", () => {
+    const input = createAnimationBinary();
+    input.writeFloatLE(Number.NaN, 85);
+
+    expect(() => parseAnimation(input)).toThrow(/不完整的无效变换/);
+  });
+
   it("renders a synthetic animation frame to PNG", async () => {
     const bundle: AnimationBundle = {
       animation: parseAnimation(createAnimationBinary()),
@@ -108,6 +125,58 @@ describe("DST animation binaries", () => {
 
     expect(result).toMatchObject({ width: 2, height: 2 });
     await expect(sharp(result.png).metadata()).resolves.toMatchObject({ width: 2, height: 2 });
+  });
+
+  it("hides explicitly named build symbols from rendered frames", async () => {
+    const bundle: AnimationBundle = {
+      animation: parseAnimation(createAnimationBinary()),
+      build: parseBuild(createBuildBinary()),
+      atlases: new Map([["atlas-0.tex", {
+        width: 2,
+        height: 2,
+        rgba: new Uint8Array(16).fill(255),
+        compression: "rgba",
+        mipmapCount: 1,
+      }]]),
+    };
+
+    const result = await renderAnimationFrame(bundle, {
+      animation: "idle",
+      frameIndex: 0,
+      hiddenSymbols: ["square"],
+    });
+    const { data } = await sharp(result.png).ensureAlpha().raw()
+      .toBuffer({ resolveWithObject: true });
+
+    expect([...data].filter((_, index) => index % 4 === 3)).toEqual(
+      Array(data.length / 4).fill(0),
+    );
+  });
+
+  it("matches hidden animation layers without case sensitivity", async () => {
+    const bundle: AnimationBundle = {
+      animation: parseAnimation(createAnimationBinary()),
+      build: parseBuild(createBuildBinary()),
+      atlases: new Map([["atlas-0.tex", {
+        width: 2,
+        height: 2,
+        rgba: new Uint8Array(16).fill(255),
+        compression: "rgba",
+        mipmapCount: 1,
+      }]]),
+    };
+
+    const result = await renderAnimationFrame(bundle, {
+      animation: "idle",
+      frameIndex: 0,
+      hiddenLayers: ["SQUARE_LAYER"],
+    });
+    const { data } = await sharp(result.png).ensureAlpha().raw()
+      .toBuffer({ resolveWithObject: true });
+
+    expect([...data].filter((_, index) => index % 4 === 3)).toEqual(
+      Array(data.length / 4).fill(0),
+    );
   });
 
   it("applies AnimState multiply and additive colours to rendered frames", async () => {
@@ -244,7 +313,7 @@ describe("DST animation binaries", () => {
     })).rejects.toThrow(/动画输出尺寸 8193x2 超过限制/);
   });
 
-  it("applies an override symbol even when the base build omits that animation symbol", async () => {
+  it("renders an added build symbol even when the base build omits it", async () => {
     const animation = parseAnimation(createAnimationBinary());
     const element = animation.animations[0]?.frames[0]?.elements[0];
     if (!element) throw new Error("missing synthetic element");
@@ -278,7 +347,6 @@ describe("DST animation binaries", () => {
     const rendered = await renderAnimationFrame(bundle, {
       animation: "idle",
       frameIndex: 0,
-      symbolOverrides: { snow: "snow" },
       symbolOverrideBuilds: [snowBuild],
       padding: 0,
     });

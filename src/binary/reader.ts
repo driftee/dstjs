@@ -36,10 +36,15 @@ export class BinaryReader {
   }
 
   readFloat32(): number {
+    const value = this.readFloat32Unchecked();
+    if (!Number.isFinite(value)) throw new Error(`偏移 ${this.cursor - 4} 处包含无效浮点数`);
+    return value;
+  }
+
+  readFloat32Unchecked(): number {
     this.ensureAvailable(4);
     const value = this.view.getFloat32(this.cursor, this.littleEndian);
     this.cursor += 4;
-    if (!Number.isFinite(value)) throw new Error(`偏移 ${this.cursor - 4} 处包含无效浮点数`);
     return value;
   }
 

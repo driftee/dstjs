@@ -115,29 +115,32 @@ describe("DST sprite animation compiler", () => {
     expect([...data.subarray(pixelOffset, pixelOffset + 4)]).toEqual([128, 64, 0, 255]);
   });
 
-  it("resolves missing animation symbols from an external override build", async () => {
+  it("adds external build symbols while preserving base build symbols", async () => {
     const bundle = createBundle();
     const element = bundle.animation.animations[0]?.frames[0]?.elements[0];
     const source = bundle.build.symbols[0];
     if (!element || !source) throw new Error("missing synthetic animation data");
-    element.symbolHash = 99;
-    element.symbolName = "swap_meter";
+    bundle.animation.animations[0]?.frames[0]?.elements.push({
+      ...element,
+      symbolHash: 99,
+      symbolName: "snow",
+    });
     const overrideBuild: BuildBundle = {
       build: {
         ...bundle.build,
-        name: "meter",
-        symbols: [{ ...source, hash: 5, name: "10" }],
+        name: "snow",
+        symbols: [{ ...source, hash: 99, name: "snow" }],
       },
       atlases: bundle.atlases,
     };
 
     const result = await compileDstSpriteAnimation(bundle, {
-      symbolOverrides: { swap_meter: "10" },
       symbolOverrideBuilds: [overrideBuild],
     });
 
-    expect(Object.keys(result.document.assets)).toEqual(["5:0"]);
-    expect(result.document.clips[0]?.frames[0]?.elements[0]?.spriteId).toBe("5:0");
+    expect(Object.keys(result.document.assets)).toEqual(["3:0", "63:0"]);
+    expect(result.document.clips[0]?.frames[0]?.elements.map((item) => item.spriteId))
+      .toEqual(["3:0", "63:0"]);
   });
 
   it("falls back to the latest sparse build frame", async () => {
@@ -182,7 +185,16 @@ describe("DST sprite animation compiler", () => {
     const bundle = createBundle();
 
     const result = await compileDstSpriteAnimation(bundle, {
-      hiddenLayers: ["square_layer"],
+      hiddenLayers: ["SQUARE_LAYER"],
+    });
+
+    expect(result.document.assets).toEqual({});
+    expect(result.document.clips[0]?.frames[0]?.elements).toEqual([]);
+  });
+
+  it("omits animation elements from explicitly hidden symbols", async () => {
+    const result = await compileDstSpriteAnimation(createBundle(), {
+      hiddenSymbols: ["square"],
     });
 
     expect(result.document.assets).toEqual({});

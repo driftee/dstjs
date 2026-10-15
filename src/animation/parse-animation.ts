@@ -18,6 +18,7 @@ export function parseAnimation(input: Uint8Array): AnimationFile {
   const animationCount = readCount(reader.readUint32(), "动画");
 
   const animations: Animation[] = [];
+  let actualElements = 0;
   for (let index = 0; index < animationCount; index += 1) {
     const name = reader.readString();
     const facing = reader.readUint8();
@@ -34,7 +35,9 @@ export function parseAnimation(input: Uint8Array): AnimationFile {
         name: null,
       }));
       const elementCount = readCount(reader.readUint32(), `${name} 动画元素`);
-      const elements = Array.from({ length: elementCount }, () => readElement(reader));
+      actualElements += elementCount;
+      const elements = Array.from({ length: elementCount }, () => readElement(reader))
+        .filter((element): element is AnimationElement => element !== null);
       frames.push({ bounds, events, elements });
     }
     animations.push({ name, facing, bankHash, bankName: null, frameRate, frames });
@@ -47,8 +50,6 @@ export function parseAnimation(input: Uint8Array): AnimationFile {
   const actualFrames = animations.reduce((sum, animation) => sum + animation.frames.length, 0);
   const actualEvents = animations.reduce((sum, animation) =>
     sum + animation.frames.reduce((frameSum, frame) => frameSum + frame.events.length, 0), 0);
-  const actualElements = animations.reduce((sum, animation) =>
-    sum + animation.frames.reduce((frameSum, frame) => frameSum + frame.elements.length, 0), 0);
   assertCount("动画帧", expectedFrames, actualFrames);
   assertCount("动画事件", expectedEvents, actualEvents);
   assertCount("动画元素", expectedElements, actualElements);
@@ -65,24 +66,33 @@ function readRectangle(reader: ReturnType<typeof openVersionedBinary>["reader"])
   };
 }
 
-function readElement(reader: ReturnType<typeof openVersionedBinary>["reader"]): AnimationElement {
+function readElement(reader: ReturnType<typeof openVersionedBinary>["reader"]): AnimationElement | null {
   const symbolHash = reader.readUint32();
   const buildFrame = reader.readUint32();
   const layerHash = reader.readUint32();
+  const transform = {
+    a: reader.readFloat32Unchecked(),
+    b: reader.readFloat32Unchecked(),
+    c: reader.readFloat32Unchecked(),
+    d: reader.readFloat32Unchecked(),
+    tx: reader.readFloat32Unchecked(),
+    ty: reader.readFloat32Unchecked(),
+  };
+  // DST uses six NaN transform values to mark a hidden animation element.
+  if (Object.values(transform).every(Number.isNaN)) {
+    reader.readFloat32();
+    return null;
+  }
+  if (!Object.values(transform).every(Number.isFinite)) {
+    throw new Error(`动画元素在偏移 ${reader.offset - 24} 处包含不完整的无效变换`);
+  }
   return {
     symbolHash,
     symbolName: null,
     buildFrame,
     layerHash,
     layerName: null,
-    transform: {
-      a: reader.readFloat32(),
-      b: reader.readFloat32(),
-      c: reader.readFloat32(),
-      d: reader.readFloat32(),
-      tx: reader.readFloat32(),
-      ty: reader.readFloat32(),
-    },
+    transform,
     z: reader.readFloat32(),
   };
 }

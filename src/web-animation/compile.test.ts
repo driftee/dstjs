@@ -48,6 +48,9 @@ describe("Web animation compiler", () => {
     expect(clip?.frames[0]?.elements[0]).toMatchObject({
       transform: [1, 0, 0, 1, 0, 0],
       z: 0,
+      layerName: "square_layer",
+      symbolName: "square",
+      buildFrame: 0,
     });
   });
 
